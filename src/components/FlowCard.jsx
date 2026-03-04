@@ -24,16 +24,6 @@ const fmtTime = (s) => {
   const m = s.match(/\b(\d{2}:\d{2}:\d{2})\b/);
   return m ? m[1] : s;
 };
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 // Status Classifier for consistent colors
 function classify(raw) {
@@ -53,70 +43,6 @@ function classify(raw) {
   if (/wait|pending/i.test(L)) return "Waiting";
   
   return s; 
-}
-
-const escapeHtml = (str) =>
-  String(str ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
-function rowsToCSV(rows) {
-  const header = ["Server Name", "Patch Name", "Start Time", "End Time", "Status", "Issuer"];
-  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = [header.join(",")];
-  for (const r of rows) {
-    lines.push(
-      [r.server ?? "—", r.patch ?? "—", fmtTime(r.start), fmtTime(r.end), r.status ?? "—", r.issuer ?? "—"]
-        .map(escape)
-        .join(",")
-    );
-  }
-  return lines.join("\n");
-}
-
-function rowsToHTML(rows, title = "Results") {
-  const safeTitle = escapeHtml(title);
-  const head = `
-<meta charset="utf-8"/>
-<title>${safeTitle}</title>
-<style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:16px;color:#111827}
-  h1{font-size:18px;margin:0 0 12px}
-  table{border-collapse:collapse;width:100%}
-  th,td{border:1px solid #e5e7eb;padding:8px 10px;font-size:14px}
-  thead th{background:#f8fafc;text-align:left}
-  .status-pill { padding: 4px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; display: inline-block; }
-  .status-green { background: #dcfce7; color: #166534; }
-  .status-red { background: #fee2e2; color: #991b1b; }
-  .status-blue { background: #dbeafe; color: #1e40af; }
-  .status-amber { background: #fef3c7; color: #92400e; }
-</style>`;
-  
-  const rowsHtml = (rows || []).map(r => {
-    const s = classify(r.status);
-    const cls = s === 'Success' ? 'status-green' : (s === 'Failed' || s === 'Error') ? 'status-red' : (s === 'Running') ? 'status-blue' : 'status-amber';
-    return `<tr>
-      <td>${escapeHtml(r.server ?? "—")}</td>
-      <td>${escapeHtml(r.patch ?? "—")}</td>
-      <td>${escapeHtml(fmtTime(r.start))}</td>
-      <td>${escapeHtml(fmtTime(r.end))}</td>
-      <td><span class="status-pill ${cls}">${escapeHtml(s)}</span></td>
-      <td>${escapeHtml(r.issuer ?? "—")}</td>
-    </tr>`;
-  }).join("");
-
-  return `<!doctype html><html><head>${head}</head><body>
-<h1>${safeTitle}</h1>
-<table>
-  <thead>
-    <tr><th>Server Name</th><th>Patch Name</th><th>Start Time</th><th>End Time</th><th>Status</th><th>Issuer</th></tr>
-  </thead>
-  <tbody>${rowsHtml || `<tr><td colspan="6">No rows.</td></tr>`}</tbody>
-</table>
-</body></html>`;
 }
 
 function StepChip({ label, stage, activeStage, completedSet, onClick, canGotoStage }) {
@@ -155,7 +81,9 @@ export default function FlowCard({
   completedStages = [],
   canGotoStage,
   onJumpTo,
-  role // FIX: Receive Role prop
+  role,
+  enableSandbox = true,
+  enablePilot = true
 }) {
   const [revealed, setRevealed] = useState(false);
   const [activeTab, setActiveTab] = useState("flow");
@@ -255,17 +183,25 @@ export default function FlowCard({
             
             {divider}
 
-            {/* FIX: Hide Sandbox/Pilot for EUC */}
+            {/* FIX: Hide Sandbox/Pilot if disabled in Config OR if role is EUC */}
             {!isEUC && (
               <>
-                <StepChip label="Sandbox" stage={Stage.SANDBOX}
-                  activeStage={activeStage} completedSet={completedSet}
-                  onClick={gotoStage} canGotoStage={canGotoStage} />
-                {divider}
-                <StepChip label="Pilot" stage={Stage.PILOT}
-                  activeStage={activeStage} completedSet={completedSet}
-                  onClick={gotoStage} canGotoStage={canGotoStage} />
-                {divider}
+                {enableSandbox && (
+                    <>
+                        <StepChip label="Sandbox" stage={Stage.SANDBOX}
+                        activeStage={activeStage} completedSet={completedSet}
+                        onClick={gotoStage} canGotoStage={canGotoStage} />
+                        {divider}
+                    </>
+                )}
+                {enablePilot && (
+                    <>
+                        <StepChip label="Pilot" stage={Stage.PILOT}
+                        activeStage={activeStage} completedSet={completedSet}
+                        onClick={gotoStage} canGotoStage={canGotoStage} />
+                        {divider}
+                    </>
+                )}
               </>
             )}
 
@@ -395,7 +331,6 @@ export default function FlowCard({
         .name-link::after{ content: "↗"; font-size: 11px; margin-left: 6px; opacity: .7; }
         .name-link:hover, tr:focus .name-link{ text-decoration: underline; }
 
-        /* Dropdown styles reused from PilotSandboxResult */
         .dropdown { position: relative; display: inline-block; }
         .dropdown .menu {
           position: absolute; top: 110%; right: 0; min-width: 160px;
@@ -412,13 +347,7 @@ export default function FlowCard({
   );
 }
 
-// Sub-component for ActionResultsModal included to complete the file
 function ActionResultsModal({ open, onClose, action, loading, rows, error }) {
-    // ... (This component code is identical to your previous version. Keeping it concise to stay within limits. 
-    // If you need the full 300 line implementation of the modal again, let me know, but it is unchanged.)
-    // For now I will provide a simplified placeholder to ensure the file runs, assuming you have the modal code.
-    // **Actually, I will provide the full code for completeness.**
-    
     const [filter, setFilter] = useState("");
     const [sortConfig, setSortConfig] = useState({ key: "status", dir: "asc" });
     const [page, setPage] = useState(1);
@@ -490,7 +419,11 @@ function ActionResultsModal({ open, onClose, action, loading, rows, error }) {
                                 {paginated.map((r, i) => (
                                     <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
                                         <td>{r.server}</td>
-                                        <td><span className="pill">{classify(r.status)}</span></td>
+                                        <td><span className={`status-pill ${
+                                            classify(r.status)==='Success'?'status-green':
+                                            classify(r.status)==='Failed'?'status-red':
+                                            classify(r.status)==='Running'?'status-blue':'status-amber'
+                                        }`}>{classify(r.status)}</span></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -505,6 +438,13 @@ function ActionResultsModal({ open, onClose, action, loading, rows, error }) {
                     </div>
                 </div>
             </div>
+            <style>{`
+            .status-pill { padding: 4px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; display: inline-block; }
+            .status-green { background: #dcfce7; color: #166534; }
+            .status-red { background: #fee2e2; color: #991b1b; }
+            .status-blue { background: #dbeafe; color: #1e40af; }
+            .status-amber { background: #fef3c7; color: #92400e; }
+            `}</style>
         </div>
     );
 }

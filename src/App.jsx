@@ -27,11 +27,10 @@ const API = window.env?.VITE_API_BASE || "http://localhost:5174";
 async function getJSON(url) { const r = await fetch(url, { headers: { Accept: "application/json" } }); return r.json(); }
 async function postJSON(url, body) { const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); return r.json(); }
 
-// FIX: EUC mapped to 9004
 const STATE_ID_MAP = { 'Admin': 1, 'Windows': 9002, 'Linux': 9003, 'EUC': 9004 };
 
 function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
-  const { env } = useEnvironment();
+  const { env, setEnv } = useEnvironment();
   const [stateLoading, setStateLoading] = useState(true);
   const isInitialMount = useRef(true);
   const [currentStage, setCurrentStage] = useState(Stage.CONFIG);
@@ -45,6 +44,19 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
   const isEUC = role === 'EUC';
   const apiBase = useMemo(() => API, []);
   const sharedStateId = STATE_ID_MAP[role] || 1;
+
+  // --- Load Global Config for Stage Logic ---
+  useEffect(() => {
+    getJSON(`${apiBase}/api/config`).then(res => {
+        if(res.ok) {
+            setEnv(prev => ({
+                ...prev, 
+                enableSandbox: res.enableSandbox ?? true,
+                enablePilot: res.enablePilot ?? true
+            }));
+        }
+    }).catch(console.error);
+  }, [apiBase, setEnv]);
 
   const fetchState = useCallback(async () => {
     if (!userId) { setStateLoading(false); return; }
@@ -76,24 +88,65 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
   const postStageSignal = async (stage, status) => { try { await fetch(`${apiBase}/orchestrator/stages/${stage}`, { method: "POST", body: JSON.stringify({ status }) }); } catch {} };
   const addCompleted = (stage) => { setCompletedStages(p => p.includes(stage) ? p : [...p, stage]); postStageSignal(stage, "completed"); };
 
-  // Custom Navigation Logic for EUC (Config -> Production)
   const canGotoStage = useCallback((next) => {
     if (next === Stage.CONFIG) return true;
-    if (next === Stage.PRODUCTION && isEUC && (configSaved || completedStages.includes(Stage.CONFIG))) return true; 
-    if (next === Stage.SANDBOX) return !isEUC && (configSaved || completedStages.includes(Stage.CONFIG));
-    if (next === Stage.PILOT) return !isEUC && completedStages.includes(Stage.SANDBOX);
-    if (next === Stage.PRODUCTION) return completedStages.includes(Stage.PILOT);
+    
+    // EUC Logic (Bypass everything to Production)
+    if (isEUC) {
+        if (next === Stage.PRODUCTION) return (configSaved || completedStages.includes(Stage.CONFIG));
+        if (next === Stage.FinalResult) return completedStages.includes(Stage.PRODUCTION);
+        return false;
+    }
+
+    // --- Check if stages are hard disabled in config ---
+    if (next === Stage.SANDBOX && !env.enableSandbox) return false;
+    if (next === Stage.PILOT && !env.enablePilot) return false;
+
+    // --- Normal Flow Logic (With Skip Handling) ---
+    if (next === Stage.SANDBOX) {
+        return (configSaved || completedStages.includes(Stage.CONFIG));
+    }
+
+    if (next === Stage.PILOT) {
+        // If Sandbox is ENABLED, we must have completed it
+        if (env.enableSandbox) {
+            return completedStages.includes(Stage.SANDBOX);
+        }
+        // If Sandbox is DISABLED, we only need Config completion to unlock Pilot
+        return (configSaved || completedStages.includes(Stage.CONFIG));
+    }
+
+    if (next === Stage.PRODUCTION) {
+        // Fallback chain: Check Pilot -> Check Sandbox -> Check Config
+        if (env.enablePilot) return completedStages.includes(Stage.PILOT);
+        if (env.enableSandbox) return completedStages.includes(Stage.SANDBOX);
+        return (configSaved || completedStages.includes(Stage.CONFIG));
+    }
+
     if (next === Stage.FinalResult) return completedStages.includes(Stage.PRODUCTION);
     return false;
-  }, [configSaved, completedStages, isEUC]);
+  }, [configSaved, completedStages, isEUC, env.enableSandbox, env.enablePilot]);
 
   const handleStageChange = (next) => { if (canGotoStage(next)) { setCurrentStage(next); postStageSignal(next, "active"); } };
   const recordAction = (stage, id) => { if(id) setLastActions(p => ({ ...p, [stage]: { id, ts: Date.now() } })); };
 
-  function handleConfigSaved() {
+  function handleConfigSaved(newConfig) {
     setConfigSaved(true); setConfigLocked(true); addCompleted(Stage.CONFIG);
-    // Jump to Production directly if EUC
-    const next = isEUC ? Stage.PRODUCTION : Stage.SANDBOX;
+    
+    // Determine active flags (Use passed newConfig if available, else fallback to current env)
+    const sbxEnabled = newConfig?.enableSandbox ?? env.enableSandbox;
+    const pilotEnabled = newConfig?.enablePilot ?? env.enablePilot;
+
+    // --- Calculate Next Stage (Skip Disabled) ---
+    let next = Stage.PRODUCTION; // Fallback default
+    if (isEUC) {
+        next = Stage.PRODUCTION;
+    } else {
+        if (sbxEnabled) next = Stage.SANDBOX;
+        else if (pilotEnabled) next = Stage.PILOT;
+        else next = Stage.PRODUCTION;
+    }
+    
     setCurrentStage(next); postStageSignal(next, "active");
   }
 
@@ -102,7 +155,12 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
     const id = result?.actionId;
     if (id) recordAction(Stage.SANDBOX, id);
     setSandboxTriggered(true); addCompleted(Stage.SANDBOX);
-    setCurrentStage(Stage.PILOT);
+    
+    // --- Calculate Next Stage (Skip Disabled) ---
+    let next = Stage.PRODUCTION;
+    if (env.enablePilot) next = Stage.PILOT;
+    
+    setCurrentStage(next);
   };
 
   useEffect(() => {
@@ -123,17 +181,76 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
     return () => window.removeEventListener("production:triggered", onProdTrig);
   }, [addCompleted]);
 
+  useEffect(() => {
+    const onResetSbx = () => {
+      setSandboxTriggered(false);
+      setPilotTriggered(false);
+      setCompletedStages(p => p.filter(s => s !== Stage.SANDBOX && s !== Stage.PILOT && s !== Stage.PRODUCTION && s !== Stage.FinalResult));
+      setCurrentStage(Stage.SANDBOX);
+      postStageSignal(Stage.SANDBOX, "active");
+    };
+
+    const onResetPilot = () => {
+      setPilotTriggered(false);
+      setCompletedStages(p => p.filter(s => s !== Stage.PILOT && s !== Stage.PRODUCTION && s !== Stage.FinalResult));
+      setCurrentStage(Stage.PILOT);
+      postStageSignal(Stage.PILOT, "active");
+    };
+
+    // --- Complete UI Reset (Specifically useful for EUC or hard resetting) ---
+    const onResetAll = () => {
+      setSandboxTriggered(false);
+      setPilotTriggered(false);
+      setConfigSaved(false);
+      setConfigLocked(false);
+      setCompletedStages([]);
+      setLastActions({});
+      setCurrentStage(Stage.CONFIG);
+      postStageSignal(Stage.CONFIG, "active");
+    };
+
+    window.addEventListener("orchestrator:resetToSandbox", onResetSbx);
+    window.addEventListener("orchestrator:resetToPilot", onResetPilot);
+    window.addEventListener("orchestrator:resetAll", onResetAll);
+    
+    return () => {
+      window.removeEventListener("orchestrator:resetToSandbox", onResetSbx);
+      window.removeEventListener("orchestrator:resetToPilot", onResetPilot);
+      window.removeEventListener("orchestrator:resetAll", onResetAll);
+    };
+  }, []);
+
   if (stateLoading) return <div className="app-content" style={{textAlign:'center', padding:40}}>Loading...</div>;
 
   return (
     <div className="app-content">
-      {/* Pass role to FlowCard */}
-      <FlowCard activeStage={currentStage} completedStages={completedStages} gotoStage={handleStageChange} canGotoStage={canGotoStage} role={role} />
+      <FlowCard 
+        activeStage={currentStage} 
+        completedStages={completedStages} 
+        gotoStage={handleStageChange} 
+        canGotoStage={canGotoStage} 
+        role={role}
+        enableSandbox={env.enableSandbox}
+        enablePilot={env.enablePilot}
+      />
+
+      {/* --- EUC ONLY: Reset Deployment Button to clear "green" completion --- */}
+      {isEUC && currentStage !== Stage.CONFIG && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+          <button 
+            className="btn danger" 
+            onClick={() => window.dispatchEvent(new CustomEvent("orchestrator:resetAll"))}
+            title="Reset the entire flow back to Configuration"
+          >
+            Reset Deployment Flow
+          </button>
+        </div>
+      )}
 
       {currentStage === Stage.CONFIG && <Configuration onSaved={handleConfigSaved} />}
 
-      {/* Render Sandbox only if NOT EUC */}
-      {currentStage === Stage.SANDBOX && !isEUC && (
+      {/* --- Hide Sandbox if Disabled --- */}
+      {currentStage === Stage.SANDBOX && !isEUC && env.enableSandbox && (
         <>
           <Environment />
           <div className="two-up-cards">
@@ -143,47 +260,84 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
         </>
       )}
 
-      {/* Render Pilot only if NOT EUC */}
-      {currentStage === Stage.PILOT && !isEUC && (
+      {/* --- Hide Pilot if Disabled --- */}
+      {currentStage === Stage.PILOT && !isEUC && env.enablePilot && (
         <Suspense fallback={<div>Loading Pilot...</div>}>
-          <div className="grid g-3"><PilotEnvironment mode="pilot" /><PilotSandboxResult title="Sandbox Result" actionId={lastActions?.SANDBOX?.id} /><PilotKPI title="Pilot KPI" lastActions={lastActions} /></div>
-          <div className="two-up-cards"><PilotDecisionEngine sbxDone={sandboxTriggered} mode="pilot" autoMail={env.autoMail} readOnly={pilotTriggered} lastActions={lastActions} username={username} onOpenSnapshot={onOpenSnapshot} onOpenClone={onOpenClone} /><PilotReports /></div>
-        </Suspense>
-      )}
-
-      {/* Production Stage - Adjusted for EUC */}
-      {currentStage === Stage.PRODUCTION && (
-        <Suspense fallback={<div>Loading Production...</div>}>
-          {/* Use 'euc-layout' class for 2-column grid when EUC to remove gaps */}
-          <div className={`grid g-3 ${isEUC ? "euc-layout" : ""}`}>
-            <PilotEnvironment mode="production" />
-            
-            {/* HIDE PilotSandboxResult COMPLETELY if EUC (no gap) */}
-            {!isEUC && (
-              <PilotSandboxResult title="Pilot Result" actionId={lastActions?.PILOT?.id} />
-            )}
-            
-            <PilotKPI title="Production KPI" lastActions={lastActions} />
+          <div className={`grid ${env.enableSandbox ? "g-3" : "g-2"}`}>
+            <PilotEnvironment mode="pilot" />
+            {env.enableSandbox && <PilotSandboxResult title="Sandbox Result" actionId={lastActions?.SANDBOX?.id} />}
+            <PilotKPI title="Pilot KPI" lastActions={lastActions} />
           </div>
-
+          
           <div className="two-up-cards">
-            {/* For EUC, pass forced 'done' props so engine enables Trigger */}
-            <PilotDecisionEngine sbxDone={true} pilotDone={true} mode="production" autoMail={env.autoMail} lastActions={lastActions} username={username} onOpenSnapshot={onOpenSnapshot} onOpenClone={onOpenClone} role={role} />
+            <PilotDecisionEngine 
+                sbxDone={!env.enableSandbox || sandboxTriggered} 
+                mode="pilot" 
+                autoMail={env.autoMail} 
+                readOnly={pilotTriggered} 
+                lastActions={lastActions} 
+                previousActionId={env.enableSandbox ? lastActions?.SANDBOX?.id : null}
+                username={username} 
+                onOpenSnapshot={onOpenSnapshot} 
+                onOpenClone={onOpenClone} 
+            />
             <PilotReports />
           </div>
         </Suspense>
       )}
 
-      {/* Final Result Stage */}
+      {currentStage === Stage.PRODUCTION && (
+        <Suspense fallback={<div>Loading Production...</div>}>
+          <div className={`grid ${isEUC ? "euc-layout" : (env.enablePilot || env.enableSandbox ? "g-3" : "g-2")}`}>
+            <PilotEnvironment mode="production" />
+            
+            {!isEUC && env.enablePilot && (
+                <PilotSandboxResult title="Pilot Result" actionId={lastActions?.PILOT?.id} />
+            )}
+            {!isEUC && !env.enablePilot && env.enableSandbox && (
+                <PilotSandboxResult title="Sandbox Result" actionId={lastActions?.SANDBOX?.id} />
+            )}
+            
+            <PilotKPI title="Production KPI" lastActions={lastActions} />
+          </div>
+          
+          <div className="two-up-cards">
+            <PilotDecisionEngine 
+                sbxDone={true} 
+                pilotDone={true} 
+                mode="production" 
+                autoMail={env.autoMail} 
+                lastActions={lastActions} 
+                previousActionId={
+                    !isEUC && env.enablePilot ? lastActions?.PILOT?.id : 
+                    (!isEUC && env.enableSandbox ? lastActions?.SANDBOX?.id : null)
+                }
+                username={username} 
+                onOpenSnapshot={onOpenSnapshot} 
+                onOpenClone={onOpenClone} 
+                role={role} 
+            />
+            <PilotReports />
+          </div>
+        </Suspense>
+      )}
+
       {currentStage === Stage.FinalResult && (
         <Suspense fallback={null}>
-          {/* For EUC, use g-1 to show single card properly centered or full width. For others, g-3. */}
-          <div className={`grid ${isEUC ? "g-1" : "g-3"}`}>
-            {!isEUC && <PilotSandboxResult title="Sandbox Result" actionId={lastActions?.SANDBOX?.id} />}
-            {!isEUC && <PilotSandboxResult title="Pilot Result" actionId={lastActions?.PILOT?.id} />}
-            {/* This one renders for everyone, fulfilling the user's request */}
-            <PilotSandboxResult title="Production Result" actionId={lastActions?.PRODUCTION?.id} />
-          </div>
+            {(() => {
+                let visibleCount = 1; 
+                if (!isEUC && env.enableSandbox) visibleCount++;
+                if (!isEUC && env.enablePilot) visibleCount++;
+                const gridClass = visibleCount >= 3 ? "g-3" : visibleCount === 2 ? "g-2" : "g-1";
+
+                return (
+                    <div className={`grid ${isEUC ? "g-1" : gridClass}`}>
+                        {!isEUC && env.enableSandbox && <PilotSandboxResult title="Sandbox Result" actionId={lastActions?.SANDBOX?.id} />}
+                        {!isEUC && env.enablePilot   && <PilotSandboxResult title="Pilot Result" actionId={lastActions?.PILOT?.id} />}
+                        <PilotSandboxResult title="Production Result" actionId={lastActions?.PRODUCTION?.id} />
+                    </div>
+                );
+            })()}
         </Suspense>
       )}
     </div>

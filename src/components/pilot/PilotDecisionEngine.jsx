@@ -1,7 +1,8 @@
-// vite-project/src/components/pilot/PilotDecisionEngine.jsx
+// src/components/pilot/PilotDecisionEngine.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useEnvironment } from "../Environment.jsx";
 import ValidationGate from "../ValidationGate";
+import "../../styles/Style.css";
 
 /* ---------------- API helpers ---------------- */
 const API_BASE = window.env.VITE_API_BASE;
@@ -35,7 +36,6 @@ async function postJSON(url, body) {
   return j;
 }
 
-// ... existing helper functions ...
 async function getActionResults(id, signal) {
   if (!id) return { actionId: null, total: 0, success: 0, rows: [] };
   const j = await getJSON(`${API_BASE}/api/actions/${id}/results`, signal);
@@ -52,6 +52,7 @@ async function getTotalComputersMaybe(signal) {
   return 0;
 }
 async function getActionMailStatus(id, signal) {
+  // Fallback return if ID is invalid
   if (!id || id === "null" || id === "undefined") return { state: "N/A", mailSent: true };
   try {
     const j = await getJSON(`${API_BASE}/api/actions/${id}/status`, signal);
@@ -62,7 +63,6 @@ async function getActionMailStatus(id, signal) {
   }
 }
 
-// --- Helper for Prediction ---
 async function getPrediction(baselineName, groupName) {
   try {
     const res = await postJSON(`${API_BASE}/api/predict/success`, { baselineName, groupName });
@@ -90,7 +90,6 @@ export default function PilotDecisionEngine({
 }) {
   const { env } = useEnvironment();
   const inProduction = String(mode).toLowerCase() === "production";
-  const gateSatisfied = inProduction ? !!pilotDone : !!sbxDone;
 
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -133,25 +132,106 @@ export default function PilotDecisionEngine({
 
   const handleValidationChange = useCallback((isValid) => { setValidationReady(isValid); }, []);
 
-  // ... (Effects for Config, Polling, Counts, Refresh KPIs, Evaluate - Unchanged) ...
+  // Ensure Stage toggles fetch reliably from API
+  const [localPilotEnabled, setLocalPilotEnabled] = useState(env?.enablePilot !== false && String(env?.enablePilot) !== "false");
+  const [localSandboxEnabled, setLocalSandboxEnabled] = useState(env?.enableSandbox !== false && String(env?.enableSandbox) !== "false");
+
+  // Keep synced if environment changes externally
+  useEffect(() => {
+    if (env?.enablePilot !== undefined) setLocalPilotEnabled(String(env.enablePilot) !== "false");
+    if (env?.enableSandbox !== undefined) setLocalSandboxEnabled(String(env.enableSandbox) !== "false");
+  }, [env?.enablePilot, env?.enableSandbox]);
+
+  // Robust gate checking based strictly on active toggles
+  let isGateSatisfied = false;
+  if (inProduction) {
+      if (localPilotEnabled) isGateSatisfied = !!pilotDone;
+      else if (localSandboxEnabled) isGateSatisfied = !!sbxDone;
+      else isGateSatisfied = true;
+  } else {
+      if (localSandboxEnabled) isGateSatisfied = !!sbxDone;
+      else isGateSatisfied = true;
+  }
+
+  // Hide reset buttons appropriately
+  const showResetToSandbox = !isEUC && localSandboxEnabled;
+  const showResetToPilot = !isEUC && localPilotEnabled;
+
+  // Config Polling (fetches live states so we never lock incorrectly)
   useEffect(() => {
     const ctl = new AbortController();
-    (async () => { try { const cfg = await getJSON(`${API_BASE}/api/config`, ctl.signal); const c = cfg?.config ?? cfg; if (typeof c?.requireChg === "boolean") setRequireChg(c.requireChg); } catch {} })();
+    (async () => { 
+        try { 
+            const cfg = await getJSON(`${API_BASE}/api/config`, ctl.signal); 
+            const c = cfg?.config ?? cfg; 
+            if (typeof c?.requireChg === "boolean") setRequireChg(c.requireChg); 
+            if (typeof c?.enablePilot === "boolean") setLocalPilotEnabled(c.enablePilot);
+            if (typeof c?.enableSandbox === "boolean") setLocalSandboxEnabled(c.enableSandbox);
+        } catch {} 
+    })();
     return () => ctl.abort();
   }, []);
 
+  // AUTO-BYPASS EVALUATION IF ALL PRIOR STAGES WERE DISABLED
   useEffect(() => {
-    const prevActionId = inProduction ? lastActions?.PILOT?.id : lastActions?.SANDBOX?.id;
-    if (!gateSatisfied || readOnly) { setIsPrevStageComplete(false); setEnableEvaluate(false); return; }
-    if (isPrevStageComplete) { setEnableEvaluate(true); return; }
-    let cancelled = false; let timer;
+    const skippedPrevForProduction = inProduction && !localPilotEnabled && !localSandboxEnabled;
+    const skippedPrevForPilot = !inProduction && !localSandboxEnabled;
+    
+    if ((skippedPrevForProduction || skippedPrevForPilot) && isGateSatisfied) {
+       setEnableTriggerPilot(true);
+       setIsPrevStageComplete(true);
+       setDecision("Ready to trigger (Prior stages bypassed).");
+    }
+  }, [inProduction, localPilotEnabled, localSandboxEnabled, isGateSatisfied]);
+
+  // CAREFULLY POLL ONLY WHEN THE PREVIOUS ACTION ID IS FULLY LOADED
+  useEffect(() => {
+    if (!isGateSatisfied || readOnly) { 
+        setIsPrevStageComplete(false); 
+        setEnableEvaluate(false); 
+        return; 
+    }
+
+    // Determine what the previous action ID should be (If Pilot skipped, checks Sandbox action!)
+    let prevActionId;
+    if (inProduction) {
+      prevActionId = localPilotEnabled ? lastActions?.PILOT?.id : lastActions?.SANDBOX?.id;
+    } else {
+      prevActionId = lastActions?.SANDBOX?.id;
+    }
+
+    // If the stage was supposedly skipped, we don't poll. The bypass effect handles it.
+    const skippedPrevForProduction = inProduction && !localPilotEnabled && !localSandboxEnabled;
+    const skippedPrevForPilot = !inProduction && !localSandboxEnabled;
+    if (skippedPrevForProduction || skippedPrevForPilot) return;
+
+    // CRITICAL FIX: Prevent polling if the action ID isn't in state yet!
+    if (!prevActionId) {
+        return; 
+    }
+
+    if (isPrevStageComplete) { 
+        setEnableEvaluate(true); 
+        return; 
+    }
+
+    let cancelled = false; 
+    let timer;
     async function poll() {
       if (cancelled) return;
       const { mailSent, state } = await getActionMailStatus(prevActionId);
-      if (mailSent || String(state).toLowerCase() === "expired") { if (cancelled) return; setIsPrevStageComplete(true); setEnableEvaluate(true); if (timer) clearInterval(timer); }
+      if (mailSent || String(state).toLowerCase() === "expired") { 
+          if (cancelled) return; 
+          setIsPrevStageComplete(true); 
+          setEnableEvaluate(true); 
+          if (timer) clearInterval(timer); 
+      }
     }
-    poll(); timer = setInterval(poll, 30000); return () => { cancelled = true; if (timer) clearInterval(timer); };
-  }, [inProduction, lastActions, isPrevStageComplete, gateSatisfied, readOnly]);
+    
+    poll(); 
+    timer = setInterval(poll, 30000); 
+    return () => { cancelled = true; if (timer) clearInterval(timer); };
+  }, [inProduction, lastActions, isPrevStageComplete, isGateSatisfied, readOnly, localPilotEnabled, localSandboxEnabled]);
 
   useEffect(() => {
     const onCounts = (e) => { const d = e.detail || {}; setCounts(c => ({ ...c, reboot: num(d.reboot, counts.reboot), error1603: num(d.error1603, counts.error1603) })); };
@@ -164,19 +244,26 @@ export default function PilotDecisionEngine({
     if (showConfirmModal) setCurrentPage(1);
   }, [showConfirmModal]);
 
-  // FIX: AUTO ENABLE TRIGGER FOR EUC (Since they cannot see/click "Evaluate")
+  // AUTO ENABLE TRIGGER FOR EUC 
   useEffect(() => {
-    if (isEUC && gateSatisfied && isPrevStageComplete) {
+    if (isEUC && isGateSatisfied && isPrevStageComplete) {
        setEnableTriggerPilot(true);
        setDecision("Ready to trigger (EUC Mode)");
     }
-  }, [isEUC, gateSatisfied, isPrevStageComplete]);
+  }, [isEUC, isGateSatisfied, isPrevStageComplete]);
 
   async function refreshKpis() {
     if (refreshing) return; setRefreshing(true);
     const ab = new AbortController();
     try {
-      const actionId = inProduction ? lastActions?.PILOT?.id : lastActions?.SANDBOX?.id;
+      // Dynamically determine the action ID to evaluate
+      let actionId;
+      if (inProduction) {
+        actionId = localPilotEnabled ? lastActions?.PILOT?.id : lastActions?.SANDBOX?.id;
+      } else {
+        actionId = lastActions?.SANDBOX?.id;
+      }
+
       if (!actionId) { setEnableEvaluate(false); setDecision("Loading previous stage data..."); return; }
       const results = await getActionResults(actionId, ab.signal);
       const rows = Array.isArray(results?.rows) ? results.rows : [];
@@ -185,12 +272,12 @@ export default function PilotDecisionEngine({
       setCounts(c => ({ ...c, critical: num(ch?.count, 0) }));
       const tot = await getTotalComputersMaybe(ab.signal); if (tot > 0) setTotalComputers(tot);
       setTimeout(() => { window.dispatchEvent(new CustomEvent("pilot:requestKpiCounts")); }, 0);
-      setEnableEvaluate(gateSatisfied && isPrevStageComplete); setEnableTriggerPilot(false); setEvaluated(false); setDecision("Evaluate to see gate status…"); setChgValidated(false);
+      setEnableEvaluate(isGateSatisfied && isPrevStageComplete); setEnableTriggerPilot(false); setEvaluated(false); setDecision("Evaluate to see gate status…"); setChgValidated(false);
     } catch (e) { console.error("Refresh KPIs failed:", e); } finally { setRefreshing(false); }
   }
 
   function evaluateAndDecide() {
-    if (!gateSatisfied || !enableEvaluate || readOnly) return;
+    if (!isGateSatisfied || !enableEvaluate || readOnly) return;
     const threshold = num(env?.successThreshold, 90); const allowableCHF = num(env?.allowableCriticalHF, 0);
     const T = totalComputers > 0 ? totalComputers : Math.max(1, sandbox.total);
     const successPct = sandbox.total > 0 ? Math.round((sandbox.success / sandbox.total) * 100) : 0;
@@ -217,8 +304,7 @@ export default function PilotDecisionEngine({
   }
 
   async function handleTriggerClick() {
-    // FIX: Allow if EUC (bypassing enableTriggerPilot check if explicit) OR if enableTriggerPilot is true
-    const canProceed = enableTriggerPilot || (isEUC && gateSatisfied);
+    const canProceed = enableTriggerPilot || (isEUC && isGateSatisfied);
     
     if (!canProceed || busy || readOnly) return;
     if (requireChg && !chgValidated) { setShowChg(true); setChgErr(""); if (!chgNumber) setChgNumber("CHG"); return; }
@@ -235,8 +321,7 @@ export default function PilotDecisionEngine({
   }
 
   async function executeTrigger() {
-    // FIX: Allow if EUC
-    const canProceed = enableTriggerPilot || (isEUC && gateSatisfied);
+    const canProceed = enableTriggerPilot || (isEUC && isGateSatisfied);
     if (!canProceed || busy || readOnly) return;
     
     setShowConfirmModal(false); setBusy(true);
@@ -253,18 +338,15 @@ export default function PilotDecisionEngine({
     } catch (e) { setDecision(`Trigger failed: ${e?.message || e}`); } finally { setBusy(false); }
   }
 
-  // --- Handlers ---
   function resetToSandbox() { window.dispatchEvent(new CustomEvent("orchestrator:resetToSandbox")); }
   function resetToPilot()   { window.dispatchEvent(new CustomEvent("orchestrator:resetToPilot")); }
   const handleSnapshotClick = () => { if (onOpenSnapshot) onOpenSnapshot(); setSnapshotDone(true); };
   const handleCloneClick = () => { if (onOpenClone) onOpenClone(); setCloneDone(true); };
 
-  const derived = useMemo(() => { const T = totalComputers > 0 ? totalComputers : Math.max(1, sandbox.total); return { T, successPct: sandbox.total > 0 ? Math.round((sandbox.success / sandbox.total) * 100) : 0, healthPct: Math.round(((T - (counts.critical || 0)) / T) * 100) }; }, [sandbox.success, sandbox.total, totalComputers, counts.critical]);
   const baselineToConfirm = env?.baselineName || env?.baseline || "N/A";
   const targetGroup = inProduction ? env?.prodGroup : env?.pilotGroup;
   const needsBackup = env?.snapshotVM || env?.cloneVM; const isTriggerBlocked = needsBackup && !validationReady;
 
-  // --- PAGINATION HELPERS ---
   const currentItems = useMemo(() => {
     if (!prediction?.details) return [];
     const idxLast = currentPage * ITEMS_PER_PAGE;
@@ -274,16 +356,17 @@ export default function PilotDecisionEngine({
 
   const totalPages = prediction?.details ? Math.ceil(prediction.details.length / ITEMS_PER_PAGE) : 0;
 
-  // Calculate Disabled State for Trigger Button
-  // Enabled if: Gate is Satisfied AND (TriggerEnabled flag is true OR User is EUC)
-  // Disabled if: Busy, ReadOnly, Blocked by Validation
-  const canTrigger = enableTriggerPilot || (isEUC && gateSatisfied);
-  const isTriggerDisabled = !gateSatisfied || !canTrigger || busy || readOnly || isTriggerBlocked;
+  const canTrigger = enableTriggerPilot || (isEUC && isGateSatisfied);
+  const isTriggerDisabled = !isGateSatisfied || !canTrigger || busy || readOnly || isTriggerBlocked;
 
   return (
     <section className="card reveal" data-reveal style={{ marginBottom: 0 }}>
       <h2>Decision Engine</h2>
-      {!gateSatisfied && <div className="sub" style={{ marginBottom: 10, color: "#8a8fa3" }}>{inProduction ? "🔒 Pilot stage must be triggered first." : "🔒 Complete Sandbox stage first."}</div>}
+      {!isGateSatisfied && <div className="sub" style={{ marginBottom: 10, color: "#8a8fa3" }}>
+        {inProduction 
+          ? (localPilotEnabled ? "🔒 Pilot stage must be triggered first." : "🔒 Sandbox stage must be triggered first.") 
+          : "🔒 Complete Sandbox stage first."}
+      </div>}
       {readOnly && <div className="sub" style={{ marginBottom: 10, color: "#8a8fa3" }}>View-only: stage advanced.</div>}
 
       <div className="decision" style={{ marginBottom: 12 }}>
@@ -291,30 +374,24 @@ export default function PilotDecisionEngine({
         <span style={{ marginLeft: 10 }}>{decision}</span>
       </div>
 
-      {/* FIX: HIDE VM ACTIONS COLUMN FOR EUC USERS */}
       {!isEUC && (
         <div style={{background:"#f8fafc", padding:12, borderRadius:8, marginBottom:16, display:"flex", flexWrap: "wrap", gap:12, alignItems:"center", border:"1px solid #e2e8f0"}}>
           <strong style={{color:"#64748b", fontSize:13, textTransform:"uppercase"}}>VM Actions:</strong>
-          <button className="btn" onClick={handleSnapshotClick} disabled={!env.snapshotVM || !gateSatisfied}>{snapshotDone ? "Snapshot Done ✓" : "Take Snapshot"}</button>
-          <button className="btn" onClick={handleCloneClick} disabled={!env.cloneVM || !gateSatisfied}>{cloneDone ? "Clone Done ✓" : "Clone VMs"}</button>
+          <button className="btn" onClick={handleSnapshotClick} disabled={!env.snapshotVM || !isGateSatisfied}>{snapshotDone ? "Snapshot Done ✓" : "Take Snapshot"}</button>
+          <button className="btn" onClick={handleCloneClick} disabled={!env.cloneVM || !isGateSatisfied}>{cloneDone ? "Clone Done ✓" : "Clone VMs"}</button>
           <span style={{fontSize:12, color:"#888", marginLeft:"auto"}}>Target: <strong>{targetGroup || "None"}</strong></span>
         </div>
       )}
 
-      {needsBackup && gateSatisfied && <ValidationGate targetGroupName={targetGroup} onValidationChange={handleValidationChange} />}
+      {needsBackup && isGateSatisfied && <ValidationGate targetGroupName={targetGroup} onValidationChange={handleValidationChange} />}
 
-      {/* Action Buttons Row - Responsive */}
       <div className="row" style={{ gap: 8, flexWrap: "wrap", display: 'flex' }}>
         <button className="btn" onClick={refreshKpis} disabled={refreshing}>{refreshing ? "Refreshing…" : "Refresh KPIs"}</button>
         
-        {/* Hide Evaluate & Approve for EUC */}
         {!isEUC && (
-          <button className="btn ok" onClick={evaluateAndDecide} disabled={!gateSatisfied || !enableEvaluate || readOnly}>Evaluate &amp; Approve</button>
+          <button className="btn ok" onClick={evaluateAndDecide} disabled={!isGateSatisfied || !enableEvaluate || readOnly}>Evaluate &amp; Approve</button>
         )}
 
-        {/* TRIGGER BUTTON:
-            Enabled for EUC automatically if gateSatisfied (bypassing enableTriggerPilot check in 'disabled' prop)
-        */}
         <button 
             className="btn pri" 
             onClick={handleTriggerClick} 
@@ -324,18 +401,28 @@ export default function PilotDecisionEngine({
           {busy ? "Triggering…" : checkingBaseline ? "AI Analysis..." : (inProduction ? "Trigger Production" : "Trigger Pilot")}
         </button>
 
-        {/* Hide Reset buttons for EUC */}
-        {!inProduction && !isEUC && <button className="btn danger" onClick={resetToSandbox} disabled={!isPrevStageComplete}>Reset to Sandbox</button>}
+        {/* --- EUC Reset Button nicely placed right next to Trigger --- */}
+        {isEUC && (
+          <button 
+              className="btn danger" 
+              onClick={() => window.dispatchEvent(new CustomEvent("orchestrator:resetAll"))}
+              title="Reset the entire flow back to Configuration"
+          >
+              Reset Deployment Flow
+          </button>
+        )}
+
+        {/* Conditionally render admin reset buttons so we don't present blocked paths */}
+        {!inProduction && showResetToSandbox && <button className="btn danger" onClick={resetToSandbox} disabled={!isPrevStageComplete}>Reset to Sandbox</button>}
         
         {inProduction && (
           <>
-            {!isEUC && <button className="btn" onClick={resetToPilot} disabled={!isPrevStageComplete}>Reset to Pilot</button>}
-            {!isEUC && <button className="btn danger" onClick={resetToSandbox} disabled={!isPrevStageComplete}>Reset to Sandbox</button>}
+            {showResetToPilot && <button className="btn" onClick={resetToPilot} disabled={!isPrevStageComplete}>Reset to Pilot</button>}
+            {showResetToSandbox && <button className="btn danger" onClick={resetToSandbox} disabled={!isPrevStageComplete}>Reset to Sandbox</button>}
           </>
         )}
       </div>
 
-      {/* CHG Modal */}
       {showChg && (
         <div className="modal show" role="dialog" aria-modal="true">
           <div className="box" style={{ maxWidth: 520 }}>
@@ -352,13 +439,11 @@ export default function PilotDecisionEngine({
         </div>
       )}
 
-      {/* --- CONFIRMATION MODAL WITH PAGINATION --- */}
       {showConfirmModal && (
         <div className="modal show" role="dialog" aria-modal="true">
           <div className="box" style={{ maxWidth: 800, width: '90%' }}>
             <h3 style={{color: 'var(--primary)', marginBottom: 20}}>Confirm Action</h3>
             
-            {/* 1. Summary Card */}
             {prediction && (
                 <div style={{
                     background: prediction.error ? '#fef2f2' : (prediction.probability > 80 ? '#ecfdf5' : '#fffbeb'),
@@ -374,7 +459,6 @@ export default function PilotDecisionEngine({
                 </div>
             )}
 
-            {/* 2. Detailed Table with Pagination */}
             {prediction && !prediction.error && prediction.details && prediction.details.length > 0 && (
                 <>
                   <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16, overflow: 'hidden', overflowX: 'auto' }}>
@@ -410,7 +494,6 @@ export default function PilotDecisionEngine({
                       </table>
                   </div>
 
-                  {/* Pagination Controls */}
                   {totalPages > 1 && (
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                       <button 

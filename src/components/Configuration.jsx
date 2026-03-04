@@ -176,14 +176,19 @@ export default function Configuration({ onSaved, locked = false }) {
   const [checkService, setCheckService] = useState(false);
   const [cloneVM, setCloneVM] = useState(false);
   const [snapshotVM, setSnapshotVM] = useState(false);
+  
+  // Local State for Stage Toggles
+  const [enableSandbox, setEnableSandbox] = useState(true);
+  const [enablePilot, setEnablePilot] = useState(true);
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const configRef = useRef(null);
 
   const role = sessionStorage.getItem("user_role") || "Admin";
   const isLinux = role === "Linux";
-  // FIX: Identify EUC Role
   const isEUC = role === "EUC";
+  const isAdmin = role === "Admin";
 
   const handleNumChange = (setter) => (e) => {
     const val = e.target.value;
@@ -207,7 +212,20 @@ export default function Configuration({ onSaved, locked = false }) {
         if (typeof j?.checkServiceStatus === "boolean") setCheckService(j.checkServiceStatus);
         setCloneVM(Boolean(j?.cloneVM));
         setSnapshotVM(Boolean(j?.snapshotVM));
-        setEnv(f => ({ ...f, autoMail: j.autoMail, postMail: j.postMail, cloneVM: Boolean(j?.cloneVM), snapshotVM: Boolean(j?.snapshotVM) }));
+        
+        if (typeof j?.enableSandbox === "boolean") setEnableSandbox(j.enableSandbox);
+        if (typeof j?.enablePilot === "boolean") setEnablePilot(j.enablePilot);
+
+        setEnv(f => ({ 
+            ...f, 
+            autoMail: j.autoMail, 
+            postMail: j.postMail, 
+            cloneVM: Boolean(j?.cloneVM), 
+            snapshotVM: Boolean(j?.snapshotVM),
+            enableSandbox: j.enableSandbox ?? true, 
+            enablePilot: j.enablePilot ?? true      
+        }));
+        
         if (typeof j?.lastReportValue === "number") setLastReportValue(j.lastReportValue);
         if (typeof j?.lastReportUnit  === "string") setLastReportUnit(j.lastReportUnit);
       } catch (e) { setErr(e.message || String(e)); } finally { setTimeout(() => enhanceNativeSelects(configRef.current), 100); }
@@ -220,8 +238,9 @@ export default function Configuration({ onSaved, locked = false }) {
     setBusy(true); setErr("");
     const diskSafe = Math.max(0, Number(disk) || 0);
     const lastSafe = Math.max(0, Number(lastReportValue) || 0);
-    try {
-      await postJSON(`${API_BASE}/api/config`, {
+    
+    // Prepare new config object
+    const newConfigValues = {
         diskThreshold: diskSafe,
         requireChg: Boolean(requireChg),
         prePatchMail:  !!env.autoMail,  
@@ -229,11 +248,31 @@ export default function Configuration({ onSaved, locked = false }) {
         checkServiceStatus: Boolean(checkService),
         cloneVM: Boolean(cloneVM),
         snapshotVM: Boolean(snapshotVM),
+        enableSandbox: Boolean(enableSandbox),
+        enablePilot: Boolean(enablePilot),
         lastReportValue: lastSafe,
         lastReportUnit: String(lastReportUnit),
+    };
+
+    try {
+      await postJSON(`${API_BASE}/api/config`, newConfigValues);
+      
+      // Update Context
+      setEnv(f => ({ 
+          ...f, 
+          cloneVM: Boolean(cloneVM), 
+          snapshotVM: Boolean(snapshotVM),
+          enableSandbox: Boolean(enableSandbox),
+          enablePilot: Boolean(enablePilot)
+      }));
+
+      // FIX: Pass the NEW config values directly to parent handler
+      // This prevents the parent from reading stale 'env' values
+      onSaved?.({
+          enableSandbox: Boolean(enableSandbox),
+          enablePilot: Boolean(enablePilot)
       });
-      setEnv(f => ({ ...f, cloneVM: Boolean(cloneVM), snapshotVM: Boolean(snapshotVM) }));
-      onSaved?.();
+
     } catch (e) { setErr(e.message || String(e)); } finally { setBusy(false); }
   }
 
@@ -271,6 +310,25 @@ export default function Configuration({ onSaved, locked = false }) {
             <>
               <Switch checked={cloneVM} onChange={setCloneVM} label="Clone VM" subLabel="Create a full clone of the VM before patching." disabled={locked} />
               <Switch checked={snapshotVM} onChange={setSnapshotVM} label="Snapshot VM" subLabel="Trigger a VM snapshot for quick rollback capability." disabled={locked} />
+              
+              {/* --- Sandbox/Pilot Toggles (Admin Only) --- */}
+              <div style={{marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 16}}>
+                 <Switch 
+                   checked={enableSandbox} 
+                   onChange={setEnableSandbox} 
+                   label="Enable Sandbox Stage" 
+                   subLabel="Include Sandbox verification in the patch workflow." 
+                   disabled={locked || !isAdmin} 
+                 />
+                 <Switch 
+                   checked={enablePilot} 
+                   onChange={setEnablePilot} 
+                   label="Enable Pilot Stage" 
+                   subLabel="Include Pilot group deployment in the patch workflow." 
+                   disabled={locked || !isAdmin} 
+                 />
+                 {!isAdmin && <div style={{fontSize:12, color:'#94a3b8', marginTop:6}}>Only Administrators can modify workflow stages.</div>}
+              </div>
             </>
           )}
         </Section>
@@ -280,7 +338,7 @@ export default function Configuration({ onSaved, locked = false }) {
         </Section>
       </div>
       <div className="footer-actions">
-        <button className="btn secondary" disabled={locked} onClick={() => { if(!locked) { setDisk(10); setRequireChg(true); setCheckService(false); setCloneVM(false); setSnapshotVM(false); setLastReportValue(10); setLastReportUnit("days"); setEnv(f => ({ ...f, autoMail: false, postMail: false })); } }}>Reset to Defaults</button>
+        <button className="btn secondary" disabled={locked} onClick={() => { if(!locked) { setDisk(10); setRequireChg(true); setCheckService(false); setCloneVM(false); setSnapshotVM(false); setEnableSandbox(true); setEnablePilot(true); setLastReportValue(10); setLastReportUnit("days"); setEnv(f => ({ ...f, autoMail: false, postMail: false })); } }}>Reset to Defaults</button>
         <button className="btn primary" onClick={save} disabled={busy || locked}>{busy ? "Saving Settings..." : "Save Configuration"}</button>
       </div>
       <style>{`

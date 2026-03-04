@@ -18,6 +18,9 @@ export function EnvironmentProvider({ children }) {
     patchWindowDays: 2,
     patchWindowHours: 0,
     patchWindowMinutes: 0,
+    // --- NEW: Stage Toggles (Default to true) ---
+    enableSandbox: true,
+    enablePilot: true,
   });
   return (
     <EnvironmentContext.Provider value={{ env, setEnv }}>
@@ -203,7 +206,6 @@ export default function Environment() {
           signal: controller.signal 
       }).then(r => r.json());
 
-      // --- NEW: Fetch Baselines from API (RBAC Filtered) ---
       const baselinePromise = fetch(`${API_BASE}/api/baselines/list`, {
           headers: getHeaders(),
           signal: controller.signal
@@ -256,28 +258,24 @@ export default function Environment() {
         e.target.type === "checkbox"
           ? e.target.checked
           : e.target.type === "number"
-            ? (val === "" ? "" : Number(val)) // Allow empty string
+            ? (val === "" ? "" : Number(val))
             : val,
     }));
   };
   
   const onNumber = (k, min = 0, max = 999) => (e) => {
     const valStr = e.target.value;
-    // Allow empty string so user can delete "0"
     if (valStr === "") {
         setEnv((f) => ({ ...f, [k]: "" }));
         return;
     }
-    
     let val = parseInt(valStr, 10);
     if (isNaN(val)) {
         setEnv((f) => ({ ...f, [k]: "" }));
         return;
     }
-    
     if (val < min) val = min;
     if (val > max) val = max;
-    
     setEnv((f) => ({ ...f, [k]: val }));
   };
 

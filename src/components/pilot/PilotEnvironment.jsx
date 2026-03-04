@@ -446,14 +446,6 @@ export default function PilotEnvironment({ mode = "pilot" }) {
           </div>
         </div>
       )}
-
-      {/* Info footer for non-EUC or modified footer for EUC */}
-      <div className="sub" style={{ marginTop: 30 }}>
-        {isEUC 
-          ? "View Only Mode: Configuration managed by Admin."
-          : "Sandbox → Pilot → Production. Trigger Pilot only in Pilot stage. Promote after Evaluate."
-        }
-      </div>
     </section>
   );
 }
