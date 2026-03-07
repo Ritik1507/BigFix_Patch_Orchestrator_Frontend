@@ -211,13 +211,13 @@ export default function DashboardOverview({ navigate }) {
         <div className="kpi-card" onClick={() => navigate("cve")}>
           <h4>Total CVEs</h4>
           <p>{cves.length}</p>
-          <span>detected vulnerabilities</span>
+          <span>Detected vulnerabilities</span>
         </div>
 
         <div className="kpi-card" onClick={() => navigate("cve")}>
           <h4>KEV CVEs</h4>
           <p>{kevCount}</p>
-          <span>exploited vulnerabilities</span>
+          <span>Exploited vulnerabilities</span>
         </div>
 
         <div className="kpi-card" onClick={() => navigate("patch")}>

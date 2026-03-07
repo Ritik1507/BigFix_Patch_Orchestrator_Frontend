@@ -26,7 +26,7 @@ export default function BaselineTab({ baselines = [], pendingPatches = [] }) {
   }, [pendingPatches]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/baselines")
+    fetch("http://localhost:5174/api/baselines")
       .then((res) => res.json())
       .then((data) => {
         const formatted = (data.data || []).map((b) => ({
@@ -45,7 +45,7 @@ export default function BaselineTab({ baselines = [], pendingPatches = [] }) {
 
   // Load sites
   useEffect(() => {
-    fetch("http://localhost:5000/api/sites")
+    fetch("http://localhost:5174/api/sites")
       .then((res) => res.json())
       .then((data) => setAllSites(data))
       .catch(() => alert("Failed to load sites"));
@@ -90,7 +90,7 @@ export default function BaselineTab({ baselines = [], pendingPatches = [] }) {
 
     try {
       const res = await fetch(
-        "http://localhost:5000/api/cves/by-patches?page=1&limit=50",
+        "http://localhost:5174/api/cves/by-patches?page=1&limit=50",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -144,7 +144,7 @@ export default function BaselineTab({ baselines = [], pendingPatches = [] }) {
     try {
       setCreatingBaseline(true);
 
-      const res = await fetch("http://localhost:5000/api/baselines/create", {
+      const res = await fetch("http://localhost:5174/api/baselines/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
 
@@ -182,7 +182,7 @@ export default function BaselineTab({ baselines = [], pendingPatches = [] }) {
 
   const fetchBaselineDetails = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/baselines/${id}`);
+      const res = await fetch(`http://localhost:5174/api/baselines/${id}`);
       const data = await res.json();
 
       if (!res.ok) {
