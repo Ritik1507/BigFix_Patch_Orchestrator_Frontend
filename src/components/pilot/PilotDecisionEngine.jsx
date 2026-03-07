@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useEnvironment } from "../Environment.jsx";
 import ValidationGate from "../ValidationGate";
-import "../../styles/Style.css";
 
 /* ---------------- API helpers ---------------- */
 const API_BASE = window.env.VITE_API_BASE;

@@ -19,7 +19,6 @@ const fmtTime = (s) => {
 const escapeHtml = (str) =>
   String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-/* ---------------------------- Canonical buckets ---------------------------- */
 const BUCKETS = [
   "Success", "Pending Restart", "Pending Client Restart", "Pending Message", "Pending Login",
   "Not Relevant", "Running", "Evaluating", "Waiting", "Pending Downloads", "Pending Offer Acceptance",
@@ -56,17 +55,14 @@ function classify(raw) {
   const s = String(raw || "").trim();
   if (!s) return "Not Reported";
   const L = s.toLowerCase();
-
   if (/^fixed$/i.test(s) || /^completed$/i.test(s) || /executed successfully/i.test(L)) return "Success";
   if (/^pending restart$/i.test(s) || /waiting for restart/i.test(L)) return "Pending Restart";
   if (/^running$/i.test(s) || /is currently running/i.test(L)) return "Running";
   if (/^failed$/i.test(s) || /\baction failed\b/i.test(L)) return "Failed";
   if (/^not reported$/i.test(s)) return "Not Reported";
-  
   if (/success/i.test(L)) return "Success";
   if (/fail|error/i.test(L)) return "Failed";
   if (/wait|pending/i.test(L)) return "Waiting";
-  
   return s; 
 }
 
@@ -148,7 +144,6 @@ function rowsToHTML(rows, title = "Results") {
 }
 
 export default function PilotSandboxResult({ title = "Sandbox Result", detailTitle, actionId }) {
-  // Removed explicit EUC return null check so App.jsx can control visibility
   const [lockedId, setLockedId] = useState(null);
   const [summary, setSummary] = useState({ success: 0, total: 0 });
   const [counts, setCounts] = useState(new Map());
@@ -253,18 +248,18 @@ export default function PilotSandboxResult({ title = "Sandbox Result", detailTit
   return (
     <>
       <section className="card reveal" data-reveal>
-        <div className="row" style={{alignItems:'center'}}>
+        <div className="row items-center justify-between">
           <h2>{title}</h2>
-          <span className="spacer"></span>
           <button className="btn" onClick={() => refresh(null)} disabled={loading}>{loading ? "..." : "Refresh"}</button>
         </div>
         {err ? <div className="sub error">{err}</div> : !lockedId ? <div className="sub">No data</div> : (
           <>
-            <div className="toolbar-mini">
-              <span className="pill">{`Success: ${summary.success}/${summary.total}`}</span>
-              <span className="count">ID: {lockedId}</span>
+            <div className="toolbar-mini mt-10">
+              <span className="pill green">{`Success: ${summary.success}/${summary.total}`}</span>
               <span className="spacer"></span>
-              <a className="link" onClick={openDetails}>View Details</a>
+              <span className="count ml-10">ID: {lockedId}</span>
+              <span className="spacer"></span>
+              <a className="link cursor-pointer" onClick={openDetails}>View Details</a>
             </div>
             {statusBanner && (<div className={`status-banner ${statusBanner.type}`}>{statusBanner.type === 'running' && <span className="pulse-dot"></span>}{statusBanner.msg}</div>)}
             <div className="donut-wrap">
@@ -279,8 +274,11 @@ export default function PilotSandboxResult({ title = "Sandbox Result", detailTit
                       const dy = explode * Math.sin(rad);
                       const d = arcPath(0, 0, 48, s.start, s.end, 30);
                       const isFull = d === null;
-                      if (isFull) { return ( <g key={i} transform={`translate(${dx},${dy})`} style={{ transition: "transform 0.2s" }}> {fullRingPaths(0, 0, 48, 30).map((pd, idx) => ( <path key={idx} d={pd} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" /> ))} </g> ); }
-                      return ( <path key={i} d={d} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" transform={`translate(${dx},${dy})`} onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey(null)} style={{ transition: "transform 0.2s, filter 0.2s", filter: hoverKey === s.key ? "brightness(1.06)" : "none", cursor: "pointer" }} /> );
+                      
+                      const activeStyle = { transition: "transform 0.2s, filter 0.2s", filter: hoverKey === s.key ? "brightness(1.06)" : "none", cursor: "pointer" };
+                      
+                      if (isFull) { return ( <g key={i} transform={`translate(${dx},${dy})`} style={activeStyle}> {fullRingPaths(0, 0, 48, 30).map((pd, idx) => ( <path key={idx} d={pd} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" /> ))} </g> ); }
+                      return ( <path key={i} d={d} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" transform={`translate(${dx},${dy})`} onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey(null)} style={activeStyle} /> );
                     })}
                     <text x="0" y="-4" textAnchor="middle" fontSize="12" fontWeight="800" fill="var(--text)">{center.pct}%</text>
                     <text x="0" y="10" textAnchor="middle" fontSize="7" fill="var(--muted)">{center.label}</text>
@@ -296,25 +294,6 @@ export default function PilotSandboxResult({ title = "Sandbox Result", detailTit
         )}
       </section>
       {open && <DetailsModal open={open} onClose={() => setOpen(false)} title={detailTitle || `${title} Details`} rows={rows} loading={rowsLoading} />}
-      <style>{`
-        .donut-wrap { display: grid; grid-template-columns: 220px 1fr; padding-top: 20px; align-items: center; width: 100%; margin-top: 10px; }
-        .donut-cell { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
-        .donut-svg { width: 160px; height: 160px; display: block; }
-        .legend-cell { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
-        .legend-row { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; transition: opacity 0.2s; }
-        .legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; flex-shrink: 0; }
-        .legend-label { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .status-banner { margin: 10px 0; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .status-banner.running { background: rgba(37,99,235,0.1); color: var(--primary); }
-        .status-banner.completed { background: rgba(16,185,129,0.1); color: var(--success); }
-        .pulse-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% {opacity:0.5; transform:scale(0.8)} 50% {opacity:1; transform:scale(1.2)} 100% {opacity:0.5; transform:scale(0.8)} }
-        @media (max-width: 900px) { .donut-wrap { grid-template-columns: 1fr; justify-items: center; gap: 20px; } }
-        .dropdown { position: relative; display: inline-block; }
-        .dropdown .menu { position: absolute; top: 110%; right: 0; min-width: 160px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,.15); border-radius: 10px; padding: 6px; z-index: 50; }
-        .dropdown .item { display: block; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 10px; border-radius: 8px; color: var(--text); font-weight: 600; cursor: pointer; }
-        .dropdown .item:hover { background: var(--panel-2); }
-      `}</style>
     </>
   );
 }
@@ -338,33 +317,38 @@ function DetailsModal({ open, onClose, title, rows, loading }) {
   const totalPages = Math.ceil(sorted.length / pageSize);
   const paginated = useMemo(() => { const start = (page - 1) * pageSize; return sorted.slice(start, start + pageSize); }, [sorted, page, pageSize]);
   const handleSort = (key) => { setSortConfig(current => ({ key, dir: current.key === key && current.dir === "asc" ? "desc" : "asc" })); };
-  const getSortIcon = (key) => { if (sortConfig.key !== key) return <span style={{opacity:0.3, marginLeft: 4}}>↕</span>; return <span style={{marginLeft: 4}}>{sortConfig.dir === "asc" ? "↑" : "↓"}</span>; };
-  const doExport = (type) => { setShowMenu(false); const safeTitle = (title || "Report").replace(/[^\w.-]+/g, "_"); if (type === 'csv') { const csv = rowsToCSV(sorted); downloadBlob(new Blob([csv], { type: "text/csv" }), `${safeTitle}.csv`); } else if (type === 'html') { const html = rowsToHTML(sorted, title); downloadBlob(new Blob([html], { type: "text/html" }), `${safeTitle}.html`); } else if (type === 'pdf') { const html = rowsToHTML(sorted, title); const blob = new Blob([html], { type: "text/html" }); const url = URL.createObjectURL(blob); const iframe = document.createElement("iframe"); iframe.style.position = "fixed"; iframe.style.right = "0"; iframe.style.bottom = "0"; iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0"; iframe.src = url; iframe.onload = () => { try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch {} setTimeout(() => { URL.revokeObjectURL(url); iframe.remove(); }, 2000); }; document.body.appendChild(iframe); } };
+  const getSortIcon = (key) => { if (sortConfig.key !== key) return <span className="muted-text ml-6">↕</span>; return <span className="ml-6">{sortConfig.dir === "asc" ? "↑" : "↓"}</span>; };
+  const doExport = (type) => { setShowMenu(false); const safeTitle = (title || "Report").replace(/[^\w.-]+/g, "_"); if (type === 'csv') { const csv = rowsToCSV(sorted); downloadBlob(new Blob([csv], { type: "text/csv" }), `${safeTitle}.csv`); } else if (type === 'html') { const html = rowsToHTML(sorted, title); downloadBlob(new Blob([html], { type: "text/html" }), `${safeTitle}.html`); } else if (type === 'pdf') { const html = rowsToHTML(sorted, title); const blob = new Blob([html], { type: "text/html" }); const url = URL.createObjectURL(blob); const iframe = document.createElement("iframe"); iframe.className = "d-none"; iframe.src = url; iframe.onload = () => { try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch {} setTimeout(() => { URL.revokeObjectURL(url); iframe.remove(); }, 2000); }; document.body.appendChild(iframe); } };
 
   if (!open) return null;
   return (
     <div className="modal show" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="box" style={{ maxWidth: '960px', width: '95%', height: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><h3>{title}</h3><button className="btn" onClick={onClose}>Close</button></div>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-          <input type="text" className="control" placeholder="Search Server, Patch, or Status..." value={filter} onChange={e => setFilter(e.target.value)} style={{ flex: 1, minWidth: '240px' }} />
-          <div className="dropdown" ref={btnRef}><button className="btn" onClick={() => setShowMenu(s => !s)}>Export<svg width="14" height="14" viewBox="0 0 24 24" style={{ marginLeft: 6 }}><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button>{showMenu && (<div className="menu"><button className="item" onClick={() => doExport('csv')}>Export to CSV</button><button className="item" onClick={() => doExport('pdf')}>Export to PDF</button><button className="item" onClick={() => doExport('html')}>Export to HTML</button></div>)}</div>
+      <div className="box action-modal-box" onClick={e => e.stopPropagation()}>
+        <div className="action-modal-header"><h3>{title}</h3><button className="btn" onClick={onClose}>Close</button></div>
+        <div className="action-modal-search">
+          <input type="text" className="control action-modal-search-input" placeholder="Search Server, Patch, or Status..." value={filter} onChange={e => setFilter(e.target.value)} />
+          <div className="dropdown" ref={btnRef}><button className="btn" onClick={() => setShowMenu(s => !s)}>Export<svg width="14" height="14" viewBox="0 0 24 24" className="ml-6"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button>{showMenu && (<div className="menu"><button className="item" onClick={() => doExport('csv')}>Export to CSV</button><button className="item" onClick={() => doExport('pdf')}>Export to PDF</button><button className="item" onClick={() => doExport('html')}>Export to HTML</button></div>)}</div>
         </div>
-        <div className="tableWrap" style={{ flex: 1, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-          {loading ? (<div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading records...</div>) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--panel-2)' }}>
-                <tr><th onClick={() => handleSort('server')} style={{ cursor: 'pointer', width: '20%' }}>Server {getSortIcon('server')}</th><th onClick={() => handleSort('patch')} style={{ cursor: 'pointer', width: '30%' }}>Patch {getSortIcon('patch')}</th><th onClick={() => handleSort('start')} style={{ cursor: 'pointer', width: '10%' }}>Start {getSortIcon('start')}</th><th onClick={() => handleSort('end')} style={{ cursor: 'pointer', width: '10%' }}>End {getSortIcon('end')}</th><th onClick={() => handleSort('status')} style={{ cursor: 'pointer', width: '15%' }}>Status {getSortIcon('status')}</th><th style={{ width: '15%' }}>Issuer</th></tr>
+        <div className="tableWrap action-modal-body">
+          {loading ? (<div className="action-modal-loading text-center muted-text">Loading records...</div>) : (
+            <table className="action-modal-table">
+              <thead className="kpi-th-sticky">
+                <tr><th onClick={() => handleSort('server')} className="w-20p cursor-pointer">Server {getSortIcon('server')}</th><th onClick={() => handleSort('patch')} className="cursor-pointer">Patch {getSortIcon('patch')}</th><th onClick={() => handleSort('start')} className="w-10p cursor-pointer">Start {getSortIcon('start')}</th><th onClick={() => handleSort('end')} className="w-10p cursor-pointer">End {getSortIcon('end')}</th><th onClick={() => handleSort('status')} className="w-15p cursor-pointer">Status {getSortIcon('status')}</th><th className="w-15p">Issuer</th></tr>
               </thead>
               <tbody>
-                {paginated.length === 0 ? (<tr><td colSpan={6} style={{ padding: 20, textAlign: 'center' }}>No results found.</td></tr>) : (paginated.map((r, i) => { const shortStatus = classify(r.status); const isSuccess = shortStatus === 'Success'; const isFail = shortStatus === 'Failed' || shortStatus === 'Download Failed' || shortStatus === 'Error'; const isRunning = shortStatus === 'Running'; return (<tr key={i} style={{ borderBottom: '1px solid var(--border)' }}><td>{r.server}</td><td>{r.patch}</td><td style={{ whiteSpace: 'nowrap' }}>{fmtTime(r.start)}</td><td style={{ whiteSpace: 'nowrap' }}>{fmtTime(r.end)}</td><td><span className={`pill ${isSuccess ? 'green' : isFail ? 'red' : isRunning ? 'primary' : 'amber'}`} style={{ fontSize: '11px', display: 'inline-block', maxWidth: '100%' }} title={r.status}>{shortStatus}</span></td><td>{r.issuer}</td></tr>); }))}
+                {paginated.length === 0 ? (<tr><td colSpan={6} className="text-center p-20">No results found.</td></tr>) : (paginated.map((r, i) => { const shortStatus = classify(r.status); const isSuccess = shortStatus === 'Success'; const isFail = shortStatus === 'Failed' || shortStatus === 'Download Failed' || shortStatus === 'Error'; const isRunning = shortStatus === 'Running'; return (<tr key={i}><td>{r.server}</td><td>{r.patch}</td><td className="whitespace-nowrap">{fmtTime(r.start)}</td><td className="whitespace-nowrap">{fmtTime(r.end)}</td><td><span className={`status-pill ${isSuccess ? 'status-green' : isFail ? 'status-red' : isRunning ? 'status-blue' : 'status-amber'}`} title={r.status}>{shortStatus}</span></td><td>{r.issuer}</td></tr>); }))}
               </tbody>
             </table>
           )}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: '13px' }}>
-          <div style={{ color: 'var(--muted)' }}>Showing {sorted.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, sorted.length)} of {sorted.length} entries</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="control" style={{ height: '32px', padding: '0 8px', width: 'auto', minWidth: 'auto' }}><option value={10}>10 / page</option><option value={25}>25 / page</option><option value={50}>50 / page</option><option value={100}>100 / page</option></select><button className="btn" disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{height: '32px', padding: '0 10px'}}>Prev</button><span style={{ fontWeight: 600 }}>Page {page} of {totalPages || 1}</span><button className="btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{height: '32px', padding: '0 10px'}}>Next</button></div>
+        <div className="action-modal-footer">
+          <div className="muted-text">Showing {sorted.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, sorted.length)} of {sorted.length} entries</div>
+          <div className="action-modal-nav">
+            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="control h-32 px-10 w-auto min-w-auto"><option value={10}>10 / page</option><option value={25}>25 / page</option><option value={50}>50 / page</option><option value={100}>100 / page</option></select>
+            <button className="btn h-32 px-10" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
+            <span className="fw-600">Page {page} of {totalPages || 1}</span>
+            <button className="btn h-32 px-10" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+          </div>
         </div>
       </div>
     </div>

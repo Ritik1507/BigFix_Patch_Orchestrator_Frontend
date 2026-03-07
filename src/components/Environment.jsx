@@ -1,7 +1,6 @@
 // frontend/src/components/Environment.jsx
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-/** ---- simple context so App/DecisionEngine can read the selection ---- */
 const EnvironmentContext = createContext(null);
 export function useEnvironment() {
   const ctx = useContext(EnvironmentContext);
@@ -18,7 +17,6 @@ export function EnvironmentProvider({ children }) {
     patchWindowDays: 2,
     patchWindowHours: 0,
     patchWindowMinutes: 0,
-    // --- NEW: Stage Toggles (Default to true) ---
     enableSandbox: true,
     enablePilot: true,
   });
@@ -29,10 +27,8 @@ export function EnvironmentProvider({ children }) {
   );
 }
 
-/** Point this to your Node server (5174 by default) */
 const API_BASE = window.env?.VITE_API_BASE || "http://localhost:5174";
 
-// --- Helper to get headers with role ---
 function getHeaders() {
   return {
     "Content-Type": "application/json",
@@ -41,7 +37,6 @@ function getHeaders() {
   };
 }
 
-/* ======== Fancy native select enhancer (no JSX changes) ======== */
 function enhanceNativeSelect(selectEl) {
   if (!selectEl || selectEl.dataset.fx === "ok") return;
   selectEl.dataset.fx = "ok";
@@ -105,10 +100,6 @@ function enhanceNativeSelect(selectEl) {
   }
   function open() {
     if (wrap.classList.contains("fx-open")) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    if (spaceBelow < 200 && triggerRect.top > 200) menu.classList.add("fx-upward");
-    else menu.classList.remove("fx-upward");
     wrap.classList.add("fx-open");
     trigger.setAttribute("aria-expanded", "true");
     renderMenu();
@@ -183,8 +174,6 @@ function enhanceNativeSelects(root = document) {
   root.querySelectorAll("#card-env select.control").forEach(enhanceNativeSelect);
 }
 
-
-/* ======================= Component ======================= */
 export default function Environment() {
   const { env, setEnv } = useEnvironment();
 
@@ -216,7 +205,6 @@ export default function Environment() {
         groupPromise
       ]);
 
-      // Sort
       const bNames = (bRes.baselines || []).map(b => b.name).sort();
       const gNames = (gRes.groups || []).map(g => g.name).sort();
 
@@ -292,7 +280,7 @@ export default function Environment() {
 
   return (
     <section className="card reveal" id="card-env" data-reveal>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div className="env-header-row">
         <h2>Environment &amp; Baseline</h2>
         <button type="button" onClick={loadOptions} disabled={loading} className="btn" title="Reload">
           {loading ? "Loading…" : "Reload"}
@@ -300,9 +288,9 @@ export default function Environment() {
       </div>
 
       {loading && <div className="sub">loading baselines &amp; groups…</div>}
-      {err && <div style={{ color: "#b00020", marginBottom: 12 }}>{err}</div>}
+      {err && <div className="env-error-msg">{err}</div>}
 
-      <div className="row" style={{ alignItems: "flex-end", opacity: loading ? 0.6 : 1 }}>
+      <div className="env-inputs-row" style={{ opacity: loading ? 0.6 : 1 }}>
         <div className="field">
           <span className="label">Baseline</span>
           <select className="control" value={env.baseline} onChange={on("baseline")} disabled={selectsDisabled || !baselines.length}>
@@ -323,36 +311,33 @@ export default function Environment() {
 
         <div className="field">
           <span className="label">Patch Window (Days / Hours / Mins)</span>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="env-patch-window-inputs">
             <input
               type="number"
-              className="control"
+              className="control env-patch-input"
               title="Days"
               min={0}
               value={env.patchWindowDays}
               onChange={onNumber("patchWindowDays", 0)}
               disabled={loading}
-              style={{ width: "33.3%"}}
             />
             <input
               type="number"
-              className="control"
+              className="control env-patch-input"
               title="Hours"
               min={0} max={23}
               value={env.patchWindowHours}
               onChange={onNumber("patchWindowHours", 0, 23)}
               disabled={loading}
-              style={{ width: "33.3%"}}
             />
             <input
               type="number"
-              className="control"
+              className="control env-patch-input"
               title="Minutes"
               min={0} max={59}
               value={env.patchWindowMinutes}
               onChange={onNumber("patchWindowMinutes", 0, 59)}
               disabled={loading}
-              style={{ width: "33.3%"}}
             />
           </div>
         </div>

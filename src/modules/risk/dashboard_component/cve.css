@@ -1,0 +1,78 @@
+/* ======================================
+   CVE DASHBOARD
+====================================== */
+.cve-dashboard { padding: 0; }
+
+.cve-dashboard-title {
+  font-size: 22px; font-weight: 600; margin-bottom: 24px; color: var(--text);
+}
+
+.cve-filter-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; gap: 16px; flex-wrap: wrap;
+}
+
+.cve-filter-left { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cve-filter-right { display: flex; align-items: center; }
+
+.cve-export-btn {
+  padding: 0 16px; height: 34px; background: var(--primary); border: 1px solid var(--primary);
+  border-radius: var(--radius-sm); color: var(--primary-text); font-weight: 500; cursor: pointer; font-size: 13px;
+}
+.cve-export-btn:hover { background: var(--primary-strong); border-color: var(--primary-strong); }
+
+.risk-filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.risk-filter-row select, .risk-filter-row input {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none; box-sizing: border-box;
+  height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; background: var(--panel); color: var(--text); outline: none; transition: border 0.2s;
+  font-family: "Inter", sans-serif;
+}
+.risk-filter-row select {
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 7l5 6 5-6' stroke='%23a7b0c3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; cursor: pointer;
+}
+.risk-filter-row select:hover, .risk-filter-row input:hover { border-color: var(--muted); }
+.risk-filter-row select:focus, .risk-filter-row input:focus { border-color: var(--primary); }
+.risk-filter-row input::placeholder { color: var(--muted); }
+
+.risk-filter-row button {
+  width: 40px; height: 40px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--panel); color: var(--text); cursor: pointer; display: grid; place-items: center; transition: all 0.2s;
+}
+.risk-filter-row button:hover { border-color: var(--primary); color: var(--primary); background: var(--panel-2); }
+
+.cve-table-container {
+  margin-top: 12px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow); overflow-x: auto;
+}
+
+.cve-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; }
+.cve-table thead th { background: var(--panel-2); padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2; }
+.cve-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
+.cve-table tbody tr { transition: background 0.1s; }
+.cve-table tbody tr:hover { background: var(--panel-2); }
+
+.cve-link { text-align: center; cursor: pointer; color: var(--primary); font-weight: 600; }
+.cve-link:hover { text-decoration: underline; color: var(--primary-strong); }
+.cve-count { text-align: center; font-weight: 500; }
+
+.cve-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(2px);
+  display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px;
+}
+.cve-modal {
+  background: var(--panel); border: 1px solid var(--border); width: 100%; max-width: 500px;
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: 85vh;
+}
+.cve-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.cve-modal-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.cve-modal-close { background: none; border: none; font-size: 20px; color: var(--muted); cursor: pointer; line-height: 1; padding: 4px; }
+.cve-modal-close:hover { color: var(--danger); }
+.cve-modal-body { overflow-y: auto; padding: 20px; color: var(--text); font-size: 14px; flex: 1 1 auto; }
+.cve-modal-body ul { padding-left: 20px; margin: 0; }
+.cve-modal-body li { margin-bottom: 6px; }
+
+.cve-loading { padding: 40px; color: var(--text); text-align: center; font-weight: 500; }

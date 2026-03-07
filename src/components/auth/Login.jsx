@@ -3,12 +3,10 @@ import { useState, useEffect, useRef } from "react";
 
 const API_BASE = window.env.VITE_API_BASE;
 
-/* --- Custom Select Component (Matches Management.jsx style) --- */
 function Select({ value, options, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const onDoc = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", onDoc);
@@ -49,19 +47,13 @@ function Select({ value, options, onChange, disabled }) {
   );
 }
 
-/* --- Main Login Component --- */
 export default function Login({ onSuccess }) {
   const [u, setU] = useState("");
   const [p, setP] = useState("");
-  
-  // First Run Setup State
   const [isSetup, setIsSetup] = useState(false);
   const [setupConfirm, setSetupConfirm] = useState("");
-  
-  // LDAP First Login State
   const [needsRole, setNeedsRole] = useState(false);
   const [selectedRole, setSelectedRole] = useState("Windows");
-  
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -85,7 +77,6 @@ export default function Login({ onSuccess }) {
 
     try {
       if (isSetup) {
-        // --- 1. SETUP ADMIN ---
         if (p !== setupConfirm) throw new Error("Passwords do not match.");
         const r = await fetch(`${API_BASE}/api/auth/signup`, {
             method: "POST",
@@ -99,11 +90,8 @@ export default function Login({ onSuccess }) {
         setIsSetup(false); setP(""); setSetupConfirm(""); setBusy(false); 
 
       } else if (needsRole) {
-        // --- 2. COMPLETE LDAP REGISTRATION ---
         await performLdapRegister();
-
       } else {
-        // --- 3. NORMAL LOGIN ---
         await performLogin();
       }
     } catch (e2) {
@@ -120,7 +108,6 @@ export default function Login({ onSuccess }) {
       });
       const j = await r.json().catch(() => ({}));
       
-      // Check for LDAP First Time Login signal
       if (j.error === 'role_required') {
           setNeedsRole(true);
           setInfo(j.message || "Please select your team role to continue.");
@@ -169,7 +156,6 @@ export default function Login({ onSuccess }) {
 
         <form onSubmit={handleAction}>
           
-          {/* USERNAME */}
           {!needsRole && (
              <label>
                 <span>Username</span>
@@ -184,7 +170,6 @@ export default function Login({ onSuccess }) {
              </label>
           )}
           
-          {/* PASSWORD */}
           {!needsRole && (
             <label>
               <span>Password</span>
@@ -199,7 +184,6 @@ export default function Login({ onSuccess }) {
             </label>
           )}
 
-          {/* ADMIN CONFIRM */}
           {isSetup && (
              <label>
                 <span>Confirm Password</span>
@@ -214,7 +198,6 @@ export default function Login({ onSuccess }) {
              </label>
           )}
 
-          {/* CUSTOM ROLE SELECTOR */}
           {needsRole && (
              <label>
                 <span>Select Team Role</span>
@@ -224,7 +207,7 @@ export default function Login({ onSuccess }) {
                     options={[
                         { value: "Windows", label: "Windows Team" },
                         { value: "Linux", label: "Linux Team" },
-                        { value: "EUC", label: "EUC Team" } // Added EUC
+                        { value: "EUC", label: "EUC Team" }
                     ]}
                 />
              </label>
@@ -244,74 +227,6 @@ export default function Login({ onSuccess }) {
           )}
         </form>
       </div>
-
-      <style>{`
-        .login-title { text-align: center; font-size: 24px; font-weight: 800; color: #2379da; margin: 0 0 20px 0; }
-        .intro-text { text-align: center; margin-bottom: 20px; color: #666; font-size: 0.9em; line-height: 1.5; }
-        .login-outer{ min-height: calc(100vh - var(--header-h,68px)); display:grid; place-items:center; background: radial-gradient(1200px 600px at 35% -10%, rgba(88,136,255,.12), transparent), radial-gradient(1200px 600px at 75% 110%, rgba(57,180,205,.18), transparent); padding: 28px 16px; }
-        .login-card{ width:100%; max-width: 520px; padding: 22px 22px 20px; border-radius: 18px; background: rgba(255,255,255,.96); backdrop-filter: blur(8px) saturate(1.1); box-shadow: 0 10px 30px rgba(0,0,0,.12); }
-
-        form{ display:grid; gap:12px; }
-        label{ display:grid; gap:6px; }
-        label span{ font-size:12px; color:#4b587c; font-weight:700; letter-spacing:.02em; }
-        
-        /* Inputs */
-        input { 
-            height:44px; padding:0 12px; border-radius:12px; border:1px solid #dbe3ff; 
-            background:#fff; outline:none; transition: box-shadow .15s, border-color .15s; width: 100%; 
-            font-size: 14px; color: #333;
-        }
-        input:focus { border-color:#97b3ff; box-shadow: 0 0 0 3px rgba(43,141,219,.15); }
-
-        /* --- Custom Select Styles (Matches Management.jsx) --- */
-        .custom-select { position: relative; width: 100%; }
-        
-        .select-trigger {
-            width: 100%; height: 44px; 
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 12px;
-            background: #fff; border: 1px solid #dbe3ff; border-radius: 12px;
-            font-size: 14px; color: #333; cursor: pointer; text-align: left;
-            transition: all 0.15s;
-        }
-        .select-trigger:focus, .custom-select.open .select-trigger {
-            outline: none; border-color:#97b3ff; box-shadow: 0 0 0 3px rgba(43,141,219,.15);
-        }
-        .chevron { color: #64748b; transition: transform 0.2s; }
-        .custom-select.open .chevron { transform: rotate(180deg); }
-
-        .select-menu {
-            position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 10;
-            background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-            box-shadow: 0 10px 40px -5px rgba(0,0,0,0.15);
-            overflow: hidden; animation: fadeIn 0.15s ease-out;
-        }
-        
-        .select-item {
-            padding: 10px 12px; font-size: 14px; color: #333; cursor: pointer;
-            display: flex; align-items: center; justify-content: space-between;
-            transition: background 0.1s;
-        }
-        .select-item:hover { background: #f1f5f9; }
-        .select-item.selected { background: #eff6ff; color: #2563eb; font-weight: 600; }
-        .tick { font-size: 14px; font-weight: bold; }
-
-        @keyframes fadeIn { from{opacity:0; transform:translateY(-5px)} to{opacity:1; transform:translateY(0)} }
-
-        /* Buttons & Alerts */
-        .btn-primary{ height:46px; border:none; border-radius:12px; font-weight:900; letter-spacing:.02em; color:#fff; background: linear-gradient(90deg,#2379da,#2379da); cursor:pointer; font-size: 14px; }
-        .btn-primary:hover { filter: brightness(110%); }
-        .btn-link { background: none; border: none; color: #666; font-size: 13px; cursor: pointer; text-decoration: underline; margin-top: 4px; }
-        
-        .alert{ padding:10px 12px; border-radius:10px; font-size:12px; }
-        .alert.error{ color:#b42318; background:#fee4e2; border:1px solid #f1a29d; }
-        .alert.success{ color:#05603a; background:#e9f8f1; border:1px solid #93d5b5; }
-
-        @media (max-width: 480px) {
-          .login-card { padding: 20px 16px; }
-          .login-title { font-size: 20px; }
-        }
-      `}</style>
     </div>
   );
 }

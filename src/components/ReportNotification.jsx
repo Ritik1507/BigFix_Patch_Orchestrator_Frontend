@@ -1,7 +1,4 @@
 // ReportNotification.jsx
-// Minimal: only a live message feed (no CSV/PDF, no counters/snapshot).
-// Reusable in Sandbox, Pilot, and Production views.
-
 import { useEffect, useState, useCallback } from "react";
 
 const LS_KEY = "orchestrator:v1";
@@ -14,33 +11,26 @@ function fmt(ts) {
 }
 
 export default function ReportNotification() {
-  const [feed, setFeed] = useState([]); // [{ ts, kind, msg }]
+  const [feed, setFeed] = useState([]);
 
   const push = useCallback((kind, msg) => {
     setFeed((prev) => [{ ts: Date.now(), kind, msg }, ...prev].slice(0, 300));
   }, []);
 
-  // Optional: on first load, drop a line showing last known stage from LS
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return;
       const s = JSON.parse(raw);
-      if (s?.currentStage) {
-        push("note", `Loaded state: ${s.currentStage}`);
-      }
+      if (s?.currentStage) push("note", `Loaded state: ${s.currentStage}`);
     } catch {}
   }, [push]);
 
-  // Expose simple logger for anywhere in app
   useEffect(() => {
-    window.reportNotify = {
-      log: (msg, kind = "note") => push(kind, msg),
-    };
+    window.reportNotify = { log: (msg, kind = "note") => push(kind, msg) };
     return () => { if (window.reportNotify) delete window.reportNotify; };
   }, [push]);
 
-  // Listen to common app events and convert them into human lines
   useEffect(() => {
     const on = (ev, fn) => (window.addEventListener(ev, fn), () => window.removeEventListener(ev, fn));
 
@@ -72,7 +62,7 @@ export default function ReportNotification() {
     });
     const off7 = on("flow:navigate", (e) => {
       const st = String(e?.detail?.stage || "").toUpperCase();
-      if (st) push("nav", `Navigated to ${st}.`);
+      if (st) push("nav", `Mapsd to ${st}.`);
     });
     const off8 = on("orchestrator:resetToSandbox", () => {
       push("danger", "Reset to Sandbox requested.");
@@ -84,52 +74,20 @@ export default function ReportNotification() {
   return (
     <section className="card reveal" data-reveal>
       <h2>Reports &amp; Notifications</h2>
-
-      <div
-        className="tableWrap"
-        style={{
-          maxHeight: 360,
-          overflow: "auto",
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          marginTop: 10,
-        }}
-      >
+      <div className="tableWrap rn-table-wrap">
         <table>
           <thead>
-            <tr>
-              <th style={{ width: 140 }}>When</th>
-              <th>Message</th>
-            </tr>
+            <tr><th className="rn-th-when">When</th><th>Message</th></tr>
           </thead>
           <tbody>
             {feed.length === 0 ? (
-              <tr>
-                <td colSpan={2} style={{ padding: 14, color: "var(--muted)" }}>
-                  Waiting for events…
-                </td>
-              </tr>
+              <tr><td colSpan={2} className="rn-td-empty">Waiting for events…</td></tr>
             ) : (
               feed.map((r, i) => (
                 <tr key={i}>
-                  <td style={{ whiteSpace: "nowrap" }}>{fmt(r.ts)}</td>
+                  <td className="rn-td-nowrap">{fmt(r.ts)}</td>
                   <td>
-                    <span
-                      className={
-                        "rowchip " +
-                        (r.kind === "ok"
-                          ? "succ"
-                          : r.kind === "warn"
-                          ? "warn"
-                          : r.kind === "danger"
-                          ? "hf"
-                          : r.kind === "act"
-                          ? "pri"
-                          : r.kind === "nav"
-                          ? "muted"
-                          : "muted")
-                      }
-                    >
+                    <span className={"rowchip " + (r.kind === "ok" ? "succ" : r.kind === "warn" ? "warn" : r.kind === "danger" ? "hf" : r.kind === "act" ? "pri" : "muted")}>
                       {r.msg}
                     </span>
                   </td>

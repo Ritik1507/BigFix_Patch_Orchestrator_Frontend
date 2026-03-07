@@ -1,0 +1,555 @@
+/* =====================================================
+   GLOBAL RISK CONTAINER & OVERRIDES
+===================================================== */
+.risk-container {
+  padding: 0;
+  min-height: 100%;
+  background: transparent;
+  color: var(--text);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* =====================================================
+   TABS
+===================================================== */
+.risk-tabs {
+  margin-bottom: 24px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.risk-tabs button {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.risk-tabs button:hover {
+  background: var(--panel-2);
+  border-color: var(--muted);
+}
+
+.risk-tabs button.active {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+/* =====================================================
+   FILTER BAR (Matches main UI Inputs & Selects exactly)
+===================================================== */
+.risk-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.risk-filter-row select,
+.risk-filter-row input {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  min-width: 160px;
+  outline: none;
+  transition: border 0.2s, box-shadow 0.2s;
+  font-family: "Inter", sans-serif;
+}
+
+.risk-filter-row select {
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 7l5 6 5-6' stroke='%23a7b0c3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  cursor: pointer;
+}
+
+.risk-filter-row select:hover,
+.risk-filter-row input:hover {
+  border-color: var(--muted);
+}
+
+.risk-filter-row select:focus,
+.risk-filter-row input:focus {
+  border-color: var(--primary);
+}
+
+.risk-filter-row button {
+  height: 40px;
+  width: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: grid;
+  place-items: center;
+}
+
+.risk-filter-row button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--panel-2);
+}
+
+/* =====================================================
+   HEADER INFO
+===================================================== */
+.risk-header-info {
+  margin: 16px 0 12px 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* =====================================================
+   TABLE CONTAINER
+===================================================== */
+.risk-table {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+
+/* =====================================================
+   TABLE
+===================================================== */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+th {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+td {
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+tbody tr {
+  transition: background 0.15s ease;
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--panel-2) 60%, transparent);
+  cursor: pointer;
+}
+
+/* =====================================================
+   SELECTED ROW
+===================================================== */
+tbody tr.selected-row {
+  background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
+  border-left: 3px solid var(--primary);
+}
+
+tbody tr.selected-row td {
+  font-weight: 500;
+}
+
+/* =====================================================
+   SCROLLBARS
+===================================================== */
+.risk-table::-webkit-scrollbar,
+.patch-order-container::-webkit-scrollbar,
+.cve-table-container::-webkit-scrollbar,
+.baseline-editor::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.risk-table::-webkit-scrollbar-thumb,
+.patch-order-container::-webkit-scrollbar-thumb,
+.cve-table-container::-webkit-scrollbar-thumb,
+.baseline-editor::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+/* =====================================================
+   SEVERITY BADGES
+===================================================== */
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.severity-critical { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); border: 1px solid var(--danger); }
+.severity-high { background: color-mix(in srgb, #ea580c 15%, transparent); color: #ea580c; border: 1px solid #ea580c; }
+.severity-important { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); border: 1px solid var(--warn); }
+.severity-moderate { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); border: 1px solid var(--success); }
+.severity-low { background: color-mix(in srgb, var(--info) 15%, transparent); color: var(--info); border: 1px solid var(--info); }
+
+/* =====================================================
+   KEV BADGES
+===================================================== */
+.kev-yes-badge {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.kev-no-badge {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+/* =====================================================
+   BASELINE TWO PANEL LAYOUT
+===================================================== */
+.baseline-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 24px;
+  height: 100%;
+  align-items: stretch;
+}
+
+@media(max-width: 960px) {
+  .baseline-layout { grid-template-columns: 1fr; }
+}
+
+/* =====================================================
+   BASELINE SIDEBAR
+===================================================== */
+.baseline-sidebar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+
+.baseline-sidebar-header {
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+/* =====================================================
+   BASELINE LIST TABLE
+===================================================== */
+.baseline-list-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.baseline-list-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 16px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.baseline-list-table td {
+  padding: 10px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.baseline-list-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.baseline-list-table tbody tr:hover {
+  background: var(--panel-2);
+}
+
+.baseline-row-selected {
+  background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
+  border-left: 3px solid var(--primary);
+}
+
+/* =====================================================
+   BASELINE EDITOR
+===================================================== */
+.baseline-editor {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 24px;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+
+/* =====================================================
+   BASELINE CONFIG (Match Main UI Inputs)
+===================================================== */
+.baseline-config {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.baseline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+  flex: 1;
+}
+
+.baseline-field label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.baseline-field input,
+.baseline-field select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none; box-sizing: border-box;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  outline: none;
+  font-size: 14px;
+  transition: border 0.2s;
+  font-family: "Inter", sans-serif;
+}
+
+.baseline-field select {
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 7l5 6 5-6' stroke='%23a7b0c3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  cursor: pointer;
+}
+
+.baseline-field input:focus,
+.baseline-field select:focus {
+  border-color: var(--primary);
+}
+.baseline-field input:hover,
+.baseline-field select:hover {
+  border-color: var(--muted);
+}
+
+.baseline-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: var(--danger);
+}
+
+/* =====================================================
+   PATCH ORDER
+===================================================== */
+.patch-order-container {
+  margin-top: 20px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.patch-order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.patch-order-item:hover {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+/* =====================================================
+   CVE TABLE
+===================================================== */
+.baseline-cve-section {
+  margin-top: 24px;
+}
+
+.cve-table-container {
+  margin-top: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cve-table-container thead {
+  position: sticky;
+  top: 0;
+  background: var(--panel-2);
+  z-index: 5;
+}
+
+.cve-id-cell {
+  white-space: nowrap;
+  font-weight: 500;
+  font-family: "Roboto Mono", monospace;
+  color: var(--primary);
+}
+
+.cve-table-container th:nth-child(1),
+.cve-table-container td:nth-child(1) { width:200px; }
+.cve-table-container th:nth-child(2),
+.cve-table-container td:nth-child(2) { text-align:center; }
+.cve-table-container th:nth-child(3),
+.cve-table-container td:nth-child(3),
+.cve-table-container th:nth-child(4),
+.cve-table-container td:nth-child(4) {
+  text-align:right;
+  padding-right:18px;
+  font-variant-numeric: tabular-nums;
+}
+.cve-table-container th:nth-child(5),
+.cve-table-container td:nth-child(5) { text-align:center; }
+
+/* =====================================================
+   BUTTONS
+===================================================== */
+.primary-btn {
+  padding: 0 16px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.primary-btn:hover {
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
+}
+
+.secondary-btn {
+  padding: 0 16px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.secondary-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.danger-btn {
+  padding: 0 16px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.danger-btn:hover {
+  background: var(--danger);
+  color: var(--danger-text);
+}

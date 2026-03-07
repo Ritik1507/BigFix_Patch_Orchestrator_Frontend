@@ -11,37 +11,25 @@ export const Stage = {
 
 const API = window.env.VITE_API_BASE;
 
-/* ------------------------------- Helpers ------------------------------- */
-
 async function getJson(url, signal) {
   const r = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store", signal });
   const t = await r.text();
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${t.slice(0, 400)}`);
   return JSON.parse(t);
 }
-const fmtTime = (s) => {
-  if (!s || s === "N/A") return "—";
-  const m = s.match(/\b(\d{2}:\d{2}:\d{2})\b/);
-  return m ? m[1] : s;
-};
 
-// Status Classifier for consistent colors
 function classify(raw) {
   const s = String(raw || "").trim();
   if (!s) return "Not Reported";
   const L = s.toLowerCase();
-
   if (/^fixed$/i.test(s) || /^completed$/i.test(s) || /executed successfully/i.test(L)) return "Success";
   if (/^pending restart$/i.test(s) || /waiting for restart/i.test(L)) return "Pending Restart";
   if (/^running$/i.test(s) || /is currently running/i.test(L)) return "Running";
   if (/^failed$/i.test(s) || /\baction failed\b/i.test(L)) return "Failed";
   if (/^not reported$/i.test(s)) return "Not Reported";
-  
-  // Generic fallbacks
   if (/success/i.test(L)) return "Success";
   if (/fail|error/i.test(L)) return "Failed";
   if (/wait|pending/i.test(L)) return "Waiting";
-  
   return s; 
 }
 
@@ -67,7 +55,6 @@ function StepChip({ label, stage, activeStage, completedSet, onClick, canGotoSta
       aria-label={label}
       aria-disabled={disabled ? "true" : "false"}
       title={disabled ? "Complete earlier stages to proceed" : ""}
-      style={disabled ? { cursor: "not-allowed", opacity: 0.55 } : {}}
     >
       <span className="dot" />
       <span style={{ fontWeight: 800 }}>{label}</span>
@@ -88,13 +75,11 @@ export default function FlowCard({
   const [revealed, setRevealed] = useState(false);
   const [activeTab, setActiveTab] = useState("flow");
 
-  // deployment modal state
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [items, setItems] = useState([]); 
 
-  // Action Result Modal state
   const [detailAction, setDetailAction] = useState(null); 
   const [detailResults, setDetailResults] = useState({ loading: false, rows: [], error: null });
 
@@ -164,7 +149,6 @@ export default function FlowCard({
           </div>
 
           <div className="timeline" id="timeline">
-            {/* Deployment trigger */}
             <div
               className="step clickable"
               role="button"
@@ -183,7 +167,6 @@ export default function FlowCard({
             
             {divider}
 
-            {/* FIX: Hide Sandbox/Pilot if disabled in Config OR if role is EUC */}
             {!isEUC && (
               <>
                 {enableSandbox && (
@@ -251,7 +234,6 @@ export default function FlowCard({
           </div>
         </div>
 
-        {/* Modal with BPS actions */}
         {open && (
           <div className="modal show" role="dialog" aria-modal="true" onClick={() => setOpen(false)}>
             <div className="box" style={{ maxWidth: 920 }} onClick={(e) => e.stopPropagation()}>
@@ -308,7 +290,6 @@ export default function FlowCard({
         )}
       </section>
 
-      {/* Detail Modal */}
       {detailAction && (
         <ActionResultsModal
             open={!!detailAction}
@@ -319,30 +300,6 @@ export default function FlowCard({
             error={detailResults.error}
         />
       )}
-
-      <style>{`
-        .mini-chip{ padding:4px 8px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
-        .table{ width:100%; border-collapse:collapse; }
-        .table th, .table td{ border-bottom:1px solid var(--line); padding:8px 10px; text-align:left; }
-        .table tr:hover{ background:var(--panel-weak); }
-        .table-wrap{ margin-top:8px; }
-
-        .name-link{ all: unset; cursor: pointer; color: var(--primary, #2563eb); font-weight: 700; line-height: 1.2; display: inline-flex; align-items: center; }
-        .name-link::after{ content: "↗"; font-size: 11px; margin-left: 6px; opacity: .7; }
-        .name-link:hover, tr:focus .name-link{ text-decoration: underline; }
-
-        .dropdown { position: relative; display: inline-block; }
-        .dropdown .menu {
-          position: absolute; top: 110%; right: 0; min-width: 160px;
-          background: var(--panel); border: 1px solid var(--border);
-          box-shadow: 0 8px 24px rgba(0,0,0,.15); border-radius: 10px; padding: 6px; z-index: 50;
-        }
-        .dropdown .item {
-          display: block; width: 100%; text-align: left; background: transparent; border: 0;
-          padding: 8px 10px; border-radius: 8px; color: var(--text); font-weight: 600; cursor: pointer;
-        }
-        .dropdown .item:hover { background: var(--panel-2); }
-      `}</style>
     </>
   );
 }
@@ -352,18 +309,9 @@ function ActionResultsModal({ open, onClose, action, loading, rows, error }) {
     const [sortConfig, setSortConfig] = useState({ key: "status", dir: "asc" });
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [showMenu, setShowMenu] = useState(false);
-    const btnRef = useRef(null);
     const title = action?.name || "Action Details";
 
     useEffect(() => setPage(1), [filter, pageSize, rows]);
-    useEffect(() => {
-        function onDocClick(e) {
-            if (showMenu && btnRef.current && !btnRef.current.contains(e.target)) setShowMenu(false);
-        }
-        document.addEventListener("mousedown", onDocClick);
-        return () => document.removeEventListener("mousedown", onDocClick);
-    }, [showMenu]);
 
     const filtered = useMemo(() => {
         if (!filter) return rows;
@@ -398,26 +346,26 @@ function ActionResultsModal({ open, onClose, action, loading, rows, error }) {
 
     return (
         <div className="modal show" onClick={onClose}>
-            <div className="box" onClick={e => e.stopPropagation()} style={{ maxWidth: 960, height: '90vh', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div className="box action-modal-box" onClick={e => e.stopPropagation()}>
+                <div className="action-modal-header">
                     <h3>{title}</h3>
                     <button className="btn" onClick={onClose}>Close</button>
                 </div>
-                <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                    <input className="control" placeholder="Search..." value={filter} onChange={e => setFilter(e.target.value)} style={{ flex: 1 }} />
+                <div className="action-modal-search">
+                    <input className="control action-modal-search-input" placeholder="Search..." value={filter} onChange={e => setFilter(e.target.value)} />
                 </div>
-                <div className="tableWrap" style={{ flex: 1, overflow: 'auto' }}>
-                    {loading ? <div style={{ padding: 20 }}>Loading...</div> : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="tableWrap action-modal-body">
+                    {loading ? <div className="action-modal-loading">Loading...</div> : (
+                        <table className="action-modal-table">
                             <thead>
                                 <tr>
-                                    <th onClick={() => handleSort('server')} style={{ cursor: 'pointer' }}>Server</th>
-                                    <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status</th>
+                                    <th onClick={() => handleSort('server')}>Server</th>
+                                    <th onClick={() => handleSort('status')}>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginated.map((r, i) => (
-                                    <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                                    <tr key={i}>
                                         <td>{r.server}</td>
                                         <td><span className={`status-pill ${
                                             classify(r.status)==='Success'?'status-green':
@@ -430,21 +378,14 @@ function ActionResultsModal({ open, onClose, action, loading, rows, error }) {
                         </table>
                     )}
                 </div>
-                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
+                <div className="action-modal-footer">
                     <span>Page {page} of {totalPages || 1}</span>
-                    <div>
+                    <div className="action-modal-nav">
                         <button className="btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
-                        <button className="btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ marginLeft: 8 }}>Next</button>
+                        <button className="btn action-modal-btn-next" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
                     </div>
                 </div>
             </div>
-            <style>{`
-            .status-pill { padding: 4px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; display: inline-block; }
-            .status-green { background: #dcfce7; color: #166534; }
-            .status-red { background: #fee2e2; color: #991b1b; }
-            .status-blue { background: #dbeafe; color: #1e40af; }
-            .status-amber { background: #fef3c7; color: #92400e; }
-            `}</style>
         </div>
     );
 }

@@ -14,7 +14,7 @@ function getHeaders() {
 
 async function getJson(url, signal) {
   const headers = getHeaders();
-  delete headers["Content-Type"]; // GET
+  delete headers["Content-Type"]; 
   const r = await fetch(url, { headers, cache: "no-store", signal });
   const t = await r.text();
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${t.slice(0, 400)}`);
@@ -52,7 +52,6 @@ const rebootTone = (n) => (n === 0 ? "green" : "amber");
 
 const escapeHtml = (str) => String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-/* --- Export Helpers --- */
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -83,34 +82,19 @@ function rowsToHTML(rows, title = "Results") {
   const safeTitle = escapeHtml(title);
   if (!rows || !rows.length) return `<h1>${safeTitle}</h1><p>No Data</p>`;
   const keys = Object.keys(rows[0]);
-  
-  const head = `
-<meta charset="utf-8"/>
-<title>${safeTitle}</title>
-<style>
-  body{font-family:system-ui,-apple-system,sans-serif;padding:16px;color:#111827}
-  h1{font-size:18px;margin:0 0 12px}
-  table{border-collapse:collapse;width:100%}
-  th,td{border:1px solid #e5e7eb;padding:8px 10px;font-size:14px}
-  thead th{background:#f8fafc;text-align:left}
-</style>`;
-
+  const head = `<meta charset="utf-8"/><title>${safeTitle}</title><style>body{font-family:system-ui,-apple-system,sans-serif;padding:16px;color:#111827}h1{font-size:18px;margin:0 0 12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e5e7eb;padding:8px 10px;font-size:14px}thead th{background:#f8fafc;text-align:left}</style>`;
   const ths = keys.map(k => `<th>${escapeHtml(k)}</th>`).join("");
   const trs = rows.map(r => `<tr>${keys.map(k => `<td>${escapeHtml(r[k])}</td>`).join("")}</tr>`).join("");
-
   return `<!doctype html><html><head>${head}</head><body><h1>${safeTitle}</h1><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></body></html>`;
 }
 
-/* ------------------------------- Enhanced Modal Component ------------------------------- */
 function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows, csvFilter, extraToolbar }) {
   const [filter, setFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, dir: "asc" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPageMenu, setShowPageMenu] = useState(false);
-  
   const exportBtnRef = useRef(null);
   const pageBtnRef = useRef(null);
 
@@ -125,16 +109,12 @@ function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows,
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [showExportMenu, showPageMenu]);
 
-  // 1. Filter
   const filtered = useMemo(() => {
     if (!filter) return rows;
     const q = filter.toLowerCase();
-    return rows.filter(r => 
-      Object.values(r).some(v => String(v).toLowerCase().includes(q))
-    );
+    return rows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
   }, [rows, filter]);
 
-  // 2. Sort
   const sorted = useMemo(() => {
     if (!sortConfig.key) return filtered;
     return [...filtered].sort((a, b) => {
@@ -146,7 +126,6 @@ function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows,
     });
   }, [filtered, sortConfig]);
 
-  // 3. Paginate
   const totalPages = Math.ceil(sorted.length / pageSize);
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -154,10 +133,7 @@ function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows,
   }, [sorted, page, pageSize]);
 
   const handleSort = (key) => {
-    setSortConfig(current => ({
-      key,
-      dir: current.key === key && current.dir === "asc" ? "desc" : "asc"
-    }));
+    setSortConfig(current => ({ key, dir: current.key === key && current.dir === "asc" ? "desc" : "asc" }));
   };
 
   const doExport = (type) => {
@@ -176,7 +152,7 @@ function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows,
       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed"; iframe.style.right = "0"; iframe.style.bottom = "0"; iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0";
+      iframe.className = "d-none";
       iframe.src = url;
       iframe.onload = () => {
         try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch {}
@@ -190,30 +166,19 @@ function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows,
 
   return (
     <div className="modal show" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="box" style={{ maxWidth: '1100px', width: '95%', height: '85vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div className="box action-modal-box max-w-1100 w-95p" onClick={e => e.stopPropagation()}>
+        <div className="action-modal-header">
           <h3>{title}</h3>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input 
-            type="text" 
-            className="control" 
-            placeholder="Search..." 
-            value={filter} 
-            onChange={e => setFilter(e.target.value)}
-            style={{ flex: 1, minWidth: '240px' }}
-          />
-          
+        <div className="flex-row gap-12 mb-12 wrap items-center">
+          <input type="text" className="control flex-1 min-w-240" placeholder="Search..." value={filter} onChange={e => setFilter(e.target.value)} />
           {extraToolbar}
-
           <div className="dropdown" ref={exportBtnRef}>
             <button className="btn" onClick={() => setShowExportMenu(s => !s)}>
               Export
-              <svg width="14" height="14" viewBox="0 0 24 24" style={{ marginLeft: 6 }}>
-                <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" />
-              </svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" className="ml-6"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
             </button>
             {showExportMenu && (
               <div className="menu">
@@ -225,87 +190,51 @@ function EnhancedModal({ open, onClose, title, rows, loading, error, renderRows,
           </div>
         </div>
 
-        <div className="tableWrap" style={{ flex: 1, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+        <div className="tableWrap action-modal-body">
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Loading...</div>
+            <div className="action-modal-loading muted-text text-center">Loading...</div>
           ) : error ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--danger)' }}>{error}</div>
+            <div className="action-modal-loading text-danger text-center">{error}</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="action-modal-table">
               {renderRows(paginated, handleSort, sortConfig)}
             </table>
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: '13px' }}>
-          <div style={{ color: 'var(--muted)' }}>
-            Showing {sorted.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, sorted.length)} of {sorted.length} entries
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            
-            {/* Custom Page Size Dropdown */}
-            <div className="dropdown" ref={pageBtnRef} style={{ marginRight: 8 }}>
-               <button className="btn" style={{ height: '32px', padding: '0 10px', fontSize: 13, minWidth: '90px', justifyContent: 'space-between' }} onClick={() => setShowPageMenu(!showPageMenu)}>
+        <div className="action-modal-footer">
+          <div className="muted-text text-13">Showing {sorted.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, sorted.length)} of {sorted.length} entries</div>
+          <div className="action-modal-nav">
+            <div className="dropdown mr-10" ref={pageBtnRef}>
+               <button className="btn h-32 px-10 text-13 min-w-90 justify-between" onClick={() => setShowPageMenu(!showPageMenu)}>
                  <span>{pageSize} / page</span>
-                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{transform: showPageMenu ? 'rotate(180deg)' : 'none', transition: '0.2s'}}>
-                    <path d="M6 9l6 6 6-6"/>
-                 </svg>
+                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{transform: showPageMenu ? 'rotate(180deg)' : 'none', transition: '0.2s'}}><path d="M6 9l6 6 6-6"/></svg>
                </button>
                {showPageMenu && (
-                 <div className="menu" style={{ bottom: '100%', top: 'auto', marginBottom: 4 }}>
+                 <div className="menu page-menu-up">
                     {[10, 25, 50, 100].map(opt => (
-                       <button key={opt} className="item" onClick={() => { setPageSize(opt); setShowPageMenu(false); }}>
-                          {opt} / page
-                       </button>
+                       <button key={opt} className="item" onClick={() => { setPageSize(opt); setShowPageMenu(false); }}>{opt} / page</button>
                     ))}
                  </div>
                )}
             </div>
-
-            <button className="btn" disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{height: '32px', padding: '0 10px'}}>Prev</button>
-            <span style={{ fontWeight: 600 }}>Page {page} of {totalPages || 1}</span>
-            <button className="btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{height: '32px', padding: '0 10px'}}>Next</button>
+            <button className="btn h-32 px-10" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
+            <span className="fw-600">Page {page} of {totalPages || 1}</span>
+            <button className="btn h-32 px-10" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
           </div>
         </div>
       </div>
-      <style>{`
-        .dropdown { position: relative; display: inline-block; }
-        .dropdown .menu {
-          position: absolute; top: 110%; right: 0; min-width: 160px;
-          background: var(--panel); border: 1px solid var(--border);
-          box-shadow: 0 8px 24px rgba(0,0,0,.15); border-radius: 10px; padding: 6px; z-index: 50;
-        }
-        .dropdown .item {
-          display: block; width: 100%; text-align: left; background: transparent; border: 0;
-          padding: 8px 10px; border-radius: 8px; color: var(--text); font-weight: 600; cursor: pointer;
-        }
-        .dropdown .item:hover { background: var(--panel-2); }
-
-        input[type="checkbox"].custom-checkbox { appearance: none; width: 18px; height: 18px; border: 2px solid var(--muted); border-radius: 4px; background: var(--panel); display: inline-grid; place-content: center; cursor: pointer; padding: 0 !important; min-width: 18px !important; }
-        input[type="checkbox"].custom-checkbox:checked { background: var(--primary); border-color: var(--primary); }
-        input[type="checkbox"].custom-checkbox:checked::before { content: ""; width: 10px; height: 10px; box-shadow: inset 1em 1em white; transform-origin: center; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
-
-      `}</style>
     </div>
   );
 }
 
 function MetricTile({ label, value, tone, delay = 0, onClick }) {
+  // We keep animation delay inline as it's dynamic based on props
   return (
-    <div
-      className={`kpi ${onClick ? "clickable" : ""}`}
-      onClick={onClick}
-      style={{
-        transform: "translateY(8px) scale(0.98)",
-        opacity: 0,
-        animation: `kpi-pop 420ms cubic-bezier(.2,.8,.2,1) ${delay}ms forwards`,
-        minWidth: 140, // Ensure decent size on flex wrap
-        flex: 1
-      }}
-    >
-      <span className="label" style={{ fontWeight: 800 }}>{label}</span>
+    <div className={`kpi kpi-metric-tile ${onClick ? "clickable" : ""}`} onClick={onClick} style={{ animationDelay: `${delay}ms` }}>
+      <span className="label fw-800">{label}</span>
       <span className="value">
-        <span className={`pill click ${tone}`} style={{ fontWeight: 900 }}>{value}</span>
+        <span className={`pill click ${tone} fw-900`}>{value}</span>
       </span>
     </div>
   );
@@ -325,13 +254,7 @@ function arcPath(cx, cy, r, startDeg, endDeg, innerR = 0) {
   const siy = cy + innerR * Math.sin(toRad(endDeg));
   const eix = cx + innerR * Math.cos(toRad(startDeg));
   const eiy = cy + innerR * Math.sin(toRad(startDeg));
-  return [
-    `M ${sx} ${sy}`,
-    `A ${r} ${r} 0 ${large} 1 ${ex} ${ey}`,
-    `L ${six} ${siy}`,
-    `A ${innerR} ${innerR} 0 ${large} 0 ${eix} ${eiy}`,
-    "Z",
-  ].join(" ");
+  return [`M ${sx} ${sy}`, `A ${r} ${r} 0 ${large} 1 ${ex} ${ey}`, `L ${six} ${siy}`, `A ${innerR} ${innerR} 0 ${large} 0 ${eix} ${eiy}`, "Z"].join(" ");
 }
 function fullRingPaths(cx, cy, r, innerR) {
   const p1 = arcPath(cx, cy, r, 0, 180, innerR);
@@ -351,11 +274,13 @@ function DonutChart({ donut, center, hoverKey, setHoverKey }) {
             const dx = explode * Math.cos(rad);
             const dy = explode * Math.sin(rad);
             const d = arcPath(30, 32, 26, s.start, s.end, 16);
+            
+            // We keep the dynamic translation and filter inline
+            const activeStyle = { cursor: "pointer", transition: "transform 180ms ease, filter 180ms ease", filter: hoverKey === s.key ? "brightness(1.05)" : "none" };
+            
             if (d === null) {
                 return (
-                    <g key={i} transform={`translate(${dx},${dy})`}
-                       onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey(null)}
-                       style={{ cursor: "pointer", transition: "transform 180ms ease, filter 180ms ease", filter: hoverKey === s.key ? "brightness(1.05)" : "none" }}>
+                    <g key={i} transform={`translate(${dx},${dy})`} onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey(null)} style={activeStyle}>
                        {fullRingPaths(30, 32, 26, 16).map((path, idx) => (
                            <path key={idx} d={path} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" />
                        ))}
@@ -363,9 +288,7 @@ function DonutChart({ donut, center, hoverKey, setHoverKey }) {
                 );
             }
             return (
-              <path key={i} d={d} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" transform={`translate(${dx},${dy})`}
-                style={{ transition: "transform 180ms ease, filter 180ms ease", filter: hoverKey === s.key ? "brightness(1.05)" : "none", cursor: "pointer" }}
-                onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey(null)} />
+              <path key={i} d={d} fill={s.fill} stroke="var(--panel-1)" strokeWidth="0.2" transform={`translate(${dx},${dy})`} style={activeStyle} onMouseEnter={() => setHoverKey(s.key)} onMouseLeave={() => setHoverKey(null)} />
             );
           })}
           <text x="30" y="29" textAnchor="middle" fontSize="7" fontWeight="600" fill="var(--text)">{center.pct}%</text>
@@ -373,8 +296,7 @@ function DonutChart({ donut, center, hoverKey, setHoverKey }) {
         </g>
         <g transform="translate(64,10)" fontSize="6">
           {[{ key: "Success", fill: "var(--success)", y: 7 }, { key: "Reboot", fill: "var(--warn)", y: 18 }, { key: "Health", fill: "var(--danger)", y: 30 }].map((l) => (
-            <g key={l.key} transform={`translate(6,${l.y})`} onMouseEnter={() => setHoverKey(l.key)} onMouseLeave={() => setHoverKey(null)}
-              style={{ cursor: "pointer", opacity: hoverKey && hoverKey !== l.key ? 0.7 : 1, transition: "opacity 160ms ease" }}>
+            <g key={l.key} transform={`translate(6,${l.y})`} onMouseEnter={() => setHoverKey(l.key)} onMouseLeave={() => setHoverKey(null)} className="cursor-pointer" style={{ opacity: hoverKey && hoverKey !== l.key ? 0.7 : 1, transition: "opacity 160ms ease" }}>
               <circle cx="4" cy="4" r="3" fill={l.fill} />
               <text x="12" y="6">{l.key}</text>
             </g>
@@ -389,10 +311,10 @@ function ConfirmationModal({ open, title, children, onClose, onConfirm, busy = f
   if (!open) return null;
   return (
     <div className="modal show" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ color: "var(--primary, #2563eb)" }}>{title || "Confirm Action"}</h3>
-        <div className="sub" style={{ fontSize: 14, lineHeight: 1.6, margin: "16px 0" }}>{children}</div>
-        <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+      <div className="box max-w-520" onClick={(e) => e.stopPropagation()}>
+        <h3 className="kpi-modal-title">{title || "Confirm Action"}</h3>
+        <div className="sub kpi-confirm-sub">{children}</div>
+        <div className="flex-row justify-end gap-8 mt-10">
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="btn pri" onClick={onConfirm} disabled={busy}>{busy ? "Processing..." : "Confirm"}</button>
         </div>
@@ -401,7 +323,6 @@ function ConfirmationModal({ open, title, children, onClose, onConfirm, busy = f
   );
 }
 
-/* ------------------------------- Main KPI Component ------------------------------- */
 export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
   const mode = /production/i.test(title) ? "production" : "pilot";
   const getPinnedActionId = useCallback(() => {
@@ -420,7 +341,6 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
   const [rebootRows, setRebootRows] = useState([]);
   const [openReboot, setOpenReboot] = useState(false);
   const [rebootLoading, setRebootLoading] = useState(false);
-  // New State for Bulk Reboot
   const [selectedReboots, setSelectedReboots] = useState(new Set());
   const [confirmBulkReboot, setConfirmBulkReboot] = useState(false);
   const [bulkRebootStatus, setBulkRebootStatus] = useState("");
@@ -438,7 +358,6 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
   const [actionStatus, setActionStatus] = useState({});
   const [globalError, setGlobalError] = useState("");
 
-  // -- Role Check --
   const userRole = sessionStorage.getItem("user_role") || "Admin";
   const isEUC = userRole === "EUC";
 
@@ -552,7 +471,7 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
   async function openRebootModal() {
     setOpenReboot(true);
     setGlobalError("");
-    setSelectedReboots(new Set()); // Reset selections on open
+    setSelectedReboots(new Set()); 
     try {
       setRebootLoading(true);
       const data = await getJson(`${API_BASE}/api/health/reboot-pending`);
@@ -560,7 +479,6 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
     } catch { setRebootRows([]); } finally { setRebootLoading(false); }
   }
 
-  // --- Checkbox Handlers ---
   const toggleRebootSelection = (serverName) => {
     const next = new Set(selectedReboots);
     if (next.has(serverName)) next.delete(serverName);
@@ -576,7 +494,6 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
     }
   };
 
-  // --- Single Restart ---
   async function executeRestart() {
     const serverName = confirmRestart;
     if (!serverName) return;
@@ -593,7 +510,6 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
     }
   }
 
-  // --- Bulk Restart ---
   async function executeBulkRestart() {
     if (selectedReboots.size === 0) return;
     setBulkRebootStatus("Triggering...");
@@ -692,15 +608,12 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
   return (
     <section ref={rootRef} className="card reveal" data-reveal>
       <h2>{title}</h2>
-      <div className="row" style={{ gap: 16, alignItems: "center", display: "flex", flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <div className="kpis" style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-            
-            {/* HIDE SUCCESS RATE IF EUC */}
+      <div className="kpi-row-wrap">
+        <div className="flex-1 min-w-220">
+          <div className="kpis kpi-row-wrap">
             {!isEUC && (
               <MetricTile label="Success Rate" value={`${kpi.successRate}%`} tone={toneForSuccess(kpi.successRate)} onClick={openSuccessModal} />
             )}
-
             <MetricTile label="Critical Health Failures" value={kpi.critHealthFails} tone={toneForCHF(kpi.critHealthFails)} delay={80} onClick={openHealthModal} />
             <MetricTile label="Reboot Pending" value={kpi.rebootPending} tone={rebootTone(kpi.rebootPending)} delay={140} onClick={openRebootModal} />
           </div>
@@ -714,10 +627,10 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
         rows={successRows} loading={successLoading} 
         renderRows={(rows, handleSort, sortConfig) => (
           <>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel-2)' }}>
+            <thead className="kpi-th-sticky">
               <tr>
-                <th onClick={() => handleSort('server')} style={{cursor:'pointer'}}>Server {sortConfig.key==='server'? (sortConfig.dir==='asc'?'↑':'↓') : ''}</th>
-                <th onClick={() => handleSort('status')} style={{cursor:'pointer'}}>Status {sortConfig.key==='status'? (sortConfig.dir==='asc'?'↑':'↓') : ''}</th>
+                <th className="cursor-pointer" onClick={() => handleSort('server')}>Server {sortConfig.key==='server'? (sortConfig.dir==='asc'?'↑':'↓') : ''}</th>
+                <th className="cursor-pointer" onClick={() => handleSort('status')}>Status {sortConfig.key==='status'? (sortConfig.dir==='asc'?'↑':'↓') : ''}</th>
               </tr>
             </thead>
             <tbody>
@@ -735,14 +648,14 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
           const showService = role !== "Linux"; 
           return (
             <>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel-2)' }}>
+              <thead className="kpi-th-sticky">
                 <tr>
-                  <th onClick={() => handleSort('server')} style={{cursor:'pointer'}}>Server {sortConfig.key==='server'?(sortConfig.dir==='asc'?'↑':'↓'):''}</th>
-                  <th onClick={() => handleSort('issues')} style={{cursor:'pointer'}}>Issue</th>
+                  <th className="cursor-pointer" onClick={() => handleSort('server')}>Server {sortConfig.key==='server'?(sortConfig.dir==='asc'?'↑':'↓'):''}</th>
+                  <th className="cursor-pointer" onClick={() => handleSort('issues')}>Issue</th>
                   {showService && <th>Service Name</th>}
                   {showService && <th>Service Status</th>}
                   <th>Last Report</th>
-                  {showService && <th style={{ width: 120, textAlign: 'center' }}>Action</th>}
+                  {showService && <th className="kpi-td-120">Action</th>}
                 </tr>
               </thead>
               <tbody>
@@ -750,32 +663,19 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
                   rows.map((r, i) => {
                     const svcKey = `svc_${r.server}`;
                     const status = actionStatus[svcKey];
-                    
-                    // FIX: Strict check for Windows OS
                     const isWindows = String(r.os || "").toLowerCase().includes("win");
-                    
-                    // FIX: Ensure button only shows if Windows + Valid State
-                    const canRestart = isWindows && r.serviceStatus 
-                        && r.serviceStatus.toLowerCase() !== "running" 
-                        && r.serviceStatus !== "N/A"
-                        && r.serviceStatus !== "Not Applicable";
-
+                    const canRestart = isWindows && r.serviceStatus && r.serviceStatus.toLowerCase() !== "running" && r.serviceStatus !== "N/A" && r.serviceStatus !== "Not Applicable";
                     return (
                       <tr key={i}>
                         <td>{r.server || "N/A"}</td>
-                        <td>{(r.issues || []).map((issue, idx) => (<span key={idx} className="pill red" style={{ marginRight: 4, fontSize: 11 }}>{issue}</span>))}</td>
-                        
-                        {/* Service Name: Only show for Windows */}
+                        <td>{(r.issues || []).map((issue, idx) => (<span key={idx} className="pill red mr-10 text-11">{issue}</span>))}</td>
                         {showService && <td>{isWindows ? "Window Update" : "—"}</td>}
-                        
-                        {/* Service Status: Only show for Windows */}
                         {showService && <td>{isWindows ? (r.serviceStatus || "N/A") : "—"}</td>}
-                        
                         <td>{r.lastReportTime}</td>
                         {showService && (
-                          <td style={{ textAlign: "center" }}>
+                          <td className="kpi-td-center">
                             {canRestart && (
-                              <button className="btn pri" style={{ height: 32, padding: "0 10px", fontSize: 11 }} onClick={() => setConfirmService(r.server)} disabled={!!status}>
+                              <button className="btn pri h-32 px-10 text-11" onClick={() => setConfirmService(r.server)} disabled={!!status}>
                                 {status === "loading" ? "..." : status === "success" ? "Sent" : "Restart"}
                               </button>
                             )}
@@ -795,35 +695,27 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
         open={openReboot} onClose={() => setOpenReboot(false)} title={`${title.replace("KPI", "Reboot Pending")}`}
         rows={rebootRows} loading={rebootLoading} error={globalError}
         extraToolbar={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="flex-row gap-8 items-center">
              {selectedReboots.size > 0 && (
                 <>
                   <span className="pill amber">{selectedReboots.size} selected</span>
-                  <button 
-                    className="btn pri" 
-                    style={{ height: 32, padding: '0 12px', fontSize: 12 }}
-                    onClick={() => setConfirmBulkReboot(true)}
-                  >
-                    Restart Selected
-                  </button>
+                  <button className="btn pri h-32 px-12 text-12" onClick={() => setConfirmBulkReboot(true)}>Restart Selected</button>
                 </>
              )}
-             {bulkRebootStatus && <span style={{ fontSize: 12, color: 'var(--success)' }}>{bulkRebootStatus}</span>}
+             {bulkRebootStatus && <span className="text-12 text-success">{bulkRebootStatus}</span>}
           </div>
         }
         renderRows={(rows, handleSort, sortConfig) => (
           <>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--panel-2)' }}>
+            <thead className="kpi-th-sticky">
               <tr>
-                <th style={{ width: 40, textAlign: 'center' }}>
-                   <input type="checkbox" className="custom-checkbox" onChange={toggleAllReboots} checked={rebootRows.length > 0 && selectedReboots.size === rebootRows.length} />
-                </th>
-                <th onClick={() => handleSort('server')} style={{cursor:'pointer'}}>Server {sortConfig.key==='server'?(sortConfig.dir==='asc'?'↑':'↓'):''}</th>
+                <th className="w-40 kpi-td-center"><input type="checkbox" className="custom-checkbox" onChange={toggleAllReboots} checked={rebootRows.length > 0 && selectedReboots.size === rebootRows.length} /></th>
+                <th className="cursor-pointer" onClick={() => handleSort('server')}>Server {sortConfig.key==='server'?(sortConfig.dir==='asc'?'↑':'↓'):''}</th>
                 <th>Pending Restart</th>
                 <th>IP</th>
                 <th>UpTime</th>
                 <th>BES Relay</th>
-                <th style={{ width: 140, textAlign: "center" }}>Action</th>
+                <th className="w-140 kpi-td-center">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -831,17 +723,15 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
                 rows.map((r, i) => {
                   const status = actionStatus[r.server];
                   return (
-                    <tr key={i} onClick={() => toggleRebootSelection(r.server)} style={{ cursor: 'pointer', background: selectedReboots.has(r.server) ? 'var(--panel-2)' : 'transparent' }}>
-                      <td style={{ textAlign: 'center' }}>
-                         <input type="checkbox" className="custom-checkbox" checked={selectedReboots.has(r.server)} readOnly />
-                      </td>
+                    <tr key={i} onClick={() => toggleRebootSelection(r.server)} className={`cursor-pointer ${selectedReboots.has(r.server) ? 'selected-row' : ''}`}>
+                      <td className="kpi-td-center"><input type="checkbox" className="custom-checkbox" checked={selectedReboots.has(r.server)} readOnly /></td>
                       <td>{r.server || "N/A"}</td>
                       <td>{String(r.pendingRestart ?? r.pending ?? r.restart ?? "N/A")}</td>
                       <td>{r.ip || "N/A"}</td>
                       <td>{r.uptime || "N/A"}</td>
                       <td>{r.besRelay || "N/A"}</td>
-                      <td style={{ textAlign: "center" }} onClick={e => e.stopPropagation()}>
-                        <button className="btn pri" style={{ height: 32, padding: "0 10px", fontSize: 11 }} onClick={() => setConfirmRestart(r.server)} disabled={!!status}>
+                      <td className="kpi-td-center" onClick={e => e.stopPropagation()}>
+                        <button className="btn pri h-32 px-10 text-11" onClick={() => setConfirmRestart(r.server)} disabled={!!status}>
                           {status === "loading" ? "..." : status === "success" ? "Sent" : "Restart"}
                         </button>
                       </td>
@@ -867,21 +757,11 @@ export default function PilotKPI({ title = "Pilot KPI", lastActions = {} }) {
       )}
 
       {confirmBulkReboot && (
-        <ConfirmationModal 
-           open={confirmBulkReboot} 
-           title={`Confirm Bulk Restart (${selectedReboots.size})`} 
-           onClose={() => setConfirmBulkReboot(false)} 
-           onConfirm={executeBulkRestart} 
-           busy={bulkRebootStatus === "Triggering..."}
-        >
+        <ConfirmationModal open={confirmBulkReboot} title={`Confirm Bulk Restart (${selectedReboots.size})`} onClose={() => setConfirmBulkReboot(false)} onConfirm={executeBulkRestart} busy={bulkRebootStatus === "Triggering..."}>
            Are you sure you want to restart <strong>{selectedReboots.size}</strong> selected servers immediately?
-           <div style={{ maxHeight: 100, overflowY: 'auto', background: 'var(--panel-2)', padding: 8, borderRadius: 6, marginTop: 10, fontSize: 12 }}>
-              {Array.from(selectedReboots).join(", ")}
-           </div>
+           <div className="kpi-bulk-box">{Array.from(selectedReboots).join(", ")}</div>
         </ConfirmationModal>
       )}
-
-      <style>{`@keyframes kpi-pop { 0%{transform:translateY(10px) scale(.98);opacity:0} 60%{transform:translateY(0) scale(1.01);opacity:1} 100%{transform:translateY(0) scale(1);opacity:1} }`}</style>
     </section>
   );
 }

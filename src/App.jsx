@@ -22,6 +22,9 @@ const SnapshotManager = lazy(() => import("./components/SnapshotSelector.jsx"));
 const CloneManager = lazy(() => import("./components/CloneSelector.jsx"));
 const PatchCalendar = lazy(() => import("./components/PatchCalendar.jsx"));
 
+// Risk Module
+const RiskModule = lazy(() => import("./modules/risk/RiskModule.jsx"));
+
 const API = window.env?.VITE_API_BASE || "http://localhost:5174";
 
 async function getJSON(url) { const r = await fetch(url, { headers: { Accept: "application/json" } }); return r.json(); }
@@ -45,7 +48,6 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
   const apiBase = useMemo(() => API, []);
   const sharedStateId = STATE_ID_MAP[role] || 1;
 
-  // --- Load Global Config for Stage Logic ---
   useEffect(() => {
     getJSON(`${apiBase}/api/config`).then(res => {
         if(res.ok) {
@@ -91,33 +93,27 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
   const canGotoStage = useCallback((next) => {
     if (next === Stage.CONFIG) return true;
     
-    // EUC Logic (Bypass everything to Production)
     if (isEUC) {
         if (next === Stage.PRODUCTION) return (configSaved || completedStages.includes(Stage.CONFIG));
         if (next === Stage.FinalResult) return completedStages.includes(Stage.PRODUCTION);
         return false;
     }
 
-    // --- Check if stages are hard disabled in config ---
     if (next === Stage.SANDBOX && !env.enableSandbox) return false;
     if (next === Stage.PILOT && !env.enablePilot) return false;
 
-    // --- Normal Flow Logic (With Skip Handling) ---
     if (next === Stage.SANDBOX) {
         return (configSaved || completedStages.includes(Stage.CONFIG));
     }
 
     if (next === Stage.PILOT) {
-        // If Sandbox is ENABLED, we must have completed it
         if (env.enableSandbox) {
             return completedStages.includes(Stage.SANDBOX);
         }
-        // If Sandbox is DISABLED, we only need Config completion to unlock Pilot
         return (configSaved || completedStages.includes(Stage.CONFIG));
     }
 
     if (next === Stage.PRODUCTION) {
-        // Fallback chain: Check Pilot -> Check Sandbox -> Check Config
         if (env.enablePilot) return completedStages.includes(Stage.PILOT);
         if (env.enableSandbox) return completedStages.includes(Stage.SANDBOX);
         return (configSaved || completedStages.includes(Stage.CONFIG));
@@ -133,12 +129,10 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
   function handleConfigSaved(newConfig) {
     setConfigSaved(true); setConfigLocked(true); addCompleted(Stage.CONFIG);
     
-    // Determine active flags (Use passed newConfig if available, else fallback to current env)
     const sbxEnabled = newConfig?.enableSandbox ?? env.enableSandbox;
     const pilotEnabled = newConfig?.enablePilot ?? env.enablePilot;
 
-    // --- Calculate Next Stage (Skip Disabled) ---
-    let next = Stage.PRODUCTION; // Fallback default
+    let next = Stage.PRODUCTION;
     if (isEUC) {
         next = Stage.PRODUCTION;
     } else {
@@ -156,7 +150,6 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
     if (id) recordAction(Stage.SANDBOX, id);
     setSandboxTriggered(true); addCompleted(Stage.SANDBOX);
     
-    // --- Calculate Next Stage (Skip Disabled) ---
     let next = Stage.PRODUCTION;
     if (env.enablePilot) next = Stage.PILOT;
     
@@ -197,7 +190,6 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
       postStageSignal(Stage.PILOT, "active");
     };
 
-    // --- Complete UI Reset (Specifically useful for EUC or hard resetting) ---
     const onResetAll = () => {
       setSandboxTriggered(false);
       setPilotTriggered(false);
@@ -220,7 +212,7 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
     };
   }, []);
 
-  if (stateLoading) return <div className="app-content" style={{textAlign:'center', padding:40}}>Loading...</div>;
+  if (stateLoading) return <div className="app-content app-loading-content">Loading...</div>;
 
   return (
     <div className="app-content">
@@ -234,22 +226,8 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
         enablePilot={env.enablePilot}
       />
 
-      {/* --- EUC ONLY: Reset Deployment Button to clear "green" completion --- */}
-      {isEUC && currentStage !== Stage.CONFIG && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <button 
-            className="btn danger" 
-            onClick={() => window.dispatchEvent(new CustomEvent("orchestrator:resetAll"))}
-            title="Reset the entire flow back to Configuration"
-          >
-            Reset Deployment Flow
-          </button>
-        </div>
-      )}
-
       {currentStage === Stage.CONFIG && <Configuration onSaved={handleConfigSaved} />}
 
-      {/* --- Hide Sandbox if Disabled --- */}
       {currentStage === Stage.SANDBOX && !isEUC && env.enableSandbox && (
         <>
           <Environment />
@@ -260,7 +238,6 @@ function Main({ userId, username, role, onOpenSnapshot, onOpenClone }) {
         </>
       )}
 
-      {/* --- Hide Pilot if Disabled --- */}
       {currentStage === Stage.PILOT && !isEUC && env.enablePilot && (
         <Suspense fallback={<div>Loading Pilot...</div>}>
           <div className={`grid ${env.enableSandbox ? "g-3" : "g-2"}`}>
@@ -352,10 +329,21 @@ export default function App() {
   const [showSnapshot, setShowSnapshot] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showRisk, setShowRisk] = useState(false);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  const closeAll = () => { setShowSettings(false); setShowUserMgmt(false); setShowBaseline(false); setShowGroup(false); setShowSnapshot(false); setShowClone(false); setShowCalendar(false); };
+  const closeAll = () => { 
+    setShowSettings(false); 
+    setShowUserMgmt(false); 
+    setShowBaseline(false); 
+    setShowGroup(false); 
+    setShowSnapshot(false); 
+    setShowClone(false); 
+    setShowCalendar(false); 
+    setShowRisk(false); 
+  };
+  
   const handleLogout = async () => { try { await postJSON(`${API}/api/auth/logout`, {}); } catch {} setSession(null); closeAll(); sessionStorage.removeItem('BPS_SESSION_ACTIVE'); };
 
   useEffect(() => {
@@ -366,22 +354,35 @@ export default function App() {
     }).finally(() => setAuthLoading(false));
   }, []);
 
-  if (authLoading) return <div style={{display:'grid',placeItems:'center',height:'100vh'}}>Loading...</div>;
+  if (authLoading) return <div className="app-loading-full">Loading...</div>;
 
   return (
     <EnvironmentProvider>
-      <Header onOpenSettings={()=>{closeAll();setShowSettings(true)}} onOpenUsers={()=>{closeAll();setShowUserMgmt(true)}} onOpenBaseline={()=>{closeAll();setShowBaseline(true)}} onOpenGroup={()=>{closeAll();setShowGroup(true)}} onOpenSnapshot={()=>{closeAll();setShowSnapshot(true)}} onOpenClone={()=>{closeAll();setShowClone(true)}} onOpenCalendar={()=>{closeAll();setShowCalendar(true)}} authed={!!session} onLogout={handleLogout} role={session?.role} username={session?.username} />
+      <Header 
+        onOpenSettings={()=>{closeAll();setShowSettings(true)}} 
+        onOpenUsers={()=>{closeAll();setShowUserMgmt(true)}} 
+        onOpenBaseline={()=>{closeAll();setShowBaseline(true)}} 
+        onOpenGroup={()=>{closeAll();setShowGroup(true)}} 
+        onOpenSnapshot={()=>{closeAll();setShowSnapshot(true)}} 
+        onOpenClone={()=>{closeAll();setShowClone(true)}} 
+        onOpenCalendar={()=>{closeAll();setShowCalendar(true)}} 
+        onOpenRisk={()=>{closeAll();setShowRisk(true)}}
+        authed={!!session} 
+        onLogout={handleLogout} 
+        role={session?.role} 
+        username={session?.username} 
+      />
       {!session ? <Login onSuccess={(u)=>{sessionStorage.setItem('BPS_SESSION_ACTIVE','true');setSession(u)}} /> : 
        showBaseline ? <Suspense fallback={null}><div className="app-content"><BaselineManager onClose={()=>setShowBaseline(false)}/></div></Suspense> :
        showGroup ? <Suspense fallback={null}><div className="app-content"><GroupManager onClose={()=>setShowGroup(false)}/></div></Suspense> :
        showSnapshot ? <Suspense fallback={null}><div className="app-content"><SnapshotManager onClose={()=>setShowSnapshot(false)} groupName="All Computers"/></div></Suspense> :
        showClone ? <Suspense fallback={null}><div className="app-content"><CloneManager onClose={()=>setShowClone(false)} groupName="All Computers"/></div></Suspense> :
        showCalendar ? <Suspense fallback={null}><div className="app-content"><PatchCalendar onClose={()=>setShowCalendar(false)} userRole={session?.role} /></div></Suspense> :
+       showRisk ? <Suspense fallback={null}><div className="app-content"><RiskModule onClose={()=>setShowRisk(false)} /></div></Suspense> :
        showSettings ? <Suspense fallback={null}><div className="app-content"><Management onClose={()=>setShowSettings(false)}/></div></Suspense> :
        showUserMgmt ? <Suspense fallback={null}><div className="app-content"><UserManagement onClose={()=>setShowUserMgmt(false)} currentUserId={session?.userId}/></div></Suspense> :
        <Main userId={session?.userId} username={session?.username} role={session?.role} onOpenSnapshot={()=>{closeAll();setShowSnapshot(true)}} onOpenClone={()=>{closeAll();setShowClone(true)}} />
       }
-      <style>{`:root{ --header-h:68px; } .app-content{ padding: 10px} html, body { height:100%; }`}</style>
     </EnvironmentProvider>
   );
 }

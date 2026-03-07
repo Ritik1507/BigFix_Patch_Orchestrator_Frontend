@@ -24,47 +24,8 @@ async function postJSON(url, body) {
   return j;
 }
 
-function ensureFxStyles() {
-  if (document.getElementById("fx-select-styles")) return;
-  const css = `
-  .fx-wrap { position: relative; display: block; width: 100%; min-width: 0; }
-  .fx-trigger {
-    width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--border,#e2e8f0);
-    background: var(--panel,#fff); padding: 0 16px; display: flex; align-items: center; justify-content: space-between;
-    font: inherit; cursor: pointer; transition: all .2s ease; color: var(--text); font-size: 14px;
-    white-space: nowrap; overflow: hidden;
-  }
-  .fx-trigger:hover { border-color: #cbd5e1; }
-  .fx-trigger:focus { outline: 0; border-color: var(--primary,#3b82f6); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
-  .fx-wrap.fx-open .fx-trigger { border-color: var(--primary,#3b82f6); }
-  .fx-menu {
-    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 9999; display: none;
-    background: var(--panel,#fff); border: 1px solid var(--border,#e2e8f0);
-    border-radius: 12px; box-shadow: 0 10px 40px -5px rgba(0,0,0,0.2);
-    max-height: 240px; overflow-y: auto; animation: fxSlide .15s ease-out;
-  }
-  @keyframes fxSlide { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-  .fx-wrap.fx-open .fx-menu { display: block; }
-  .fx-menu-inner { padding: 6px; }
-  .fx-item {
-    padding: 10px 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;
-    cursor: pointer; font-size: 14px; color: var(--text); transition: background .1s;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .fx-item.fx-empty { cursor: default; color: #94a3b8; justify-content: center; font-style: italic; }
-  .fx-item:hover, .fx-item.fx-hover { background: #f1f5f9; }
-  .fx-item.fx-active { background: #eff6ff; color: #2563eb; font-weight: 600; }
-  .fx-tick { font-weight: bold; font-size: 14px; margin-left: 8px; flex-shrink: 0; }
-  `;
-  const style = document.createElement("style");
-  style.id = "fx-select-styles";
-  style.textContent = css;
-  document.head.appendChild(style);
-}
-
 function enhanceNativeSelect(selectEl) {
   if (!selectEl || selectEl.dataset.fx === "ok") return;
-  ensureFxStyles();
   selectEl.dataset.fx = "ok";
   selectEl.style.display = "none";
   const wrap = document.createElement("div");
@@ -88,7 +49,7 @@ function enhanceNativeSelect(selectEl) {
   wrap.appendChild(menu);
   const allOptions = Array.from(selectEl.querySelectorAll("option"));
   const itemsOnly = () => allOptions.filter(o => !o.disabled && o.value !== "");
-  let hoverIdx = -1;
+  
   function renderMenu() {
     menuInner.innerHTML = "";
     const real = itemsOnly();
@@ -177,7 +138,6 @@ export default function Configuration({ onSaved, locked = false }) {
   const [cloneVM, setCloneVM] = useState(false);
   const [snapshotVM, setSnapshotVM] = useState(false);
   
-  // Local State for Stage Toggles
   const [enableSandbox, setEnableSandbox] = useState(true);
   const [enablePilot, setEnablePilot] = useState(true);
 
@@ -239,7 +199,6 @@ export default function Configuration({ onSaved, locked = false }) {
     const diskSafe = Math.max(0, Number(disk) || 0);
     const lastSafe = Math.max(0, Number(lastReportValue) || 0);
     
-    // Prepare new config object
     const newConfigValues = {
         diskThreshold: diskSafe,
         requireChg: Boolean(requireChg),
@@ -257,7 +216,6 @@ export default function Configuration({ onSaved, locked = false }) {
     try {
       await postJSON(`${API_BASE}/api/config`, newConfigValues);
       
-      // Update Context
       setEnv(f => ({ 
           ...f, 
           cloneVM: Boolean(cloneVM), 
@@ -266,8 +224,6 @@ export default function Configuration({ onSaved, locked = false }) {
           enablePilot: Boolean(enablePilot)
       }));
 
-      // FIX: Pass the NEW config values directly to parent handler
-      // This prevents the parent from reading stale 'env' values
       onSaved?.({
           enableSandbox: Boolean(enableSandbox),
           enablePilot: Boolean(enablePilot)
@@ -279,7 +235,7 @@ export default function Configuration({ onSaved, locked = false }) {
   return (
     <section className="config-container card reveal" data-reveal ref={configRef}>
       <div className="header-row">
-        <div><h2>Environment Configuration</h2><p className="subtitle">Configure critical health checks, notification rules, and process gates.</p></div>
+        <div><h2>Environment Configuration</h2><p className="config-subtitle">Configure critical health checks, notification rules, and process gates.</p></div>
         {locked && <div className="badge locked">🔒 Configuration Locked</div>}
       </div>
       {err && <div className="banner error">{err}</div>}
@@ -287,14 +243,14 @@ export default function Configuration({ onSaved, locked = false }) {
         <Section title="Health Thresholds" icon="🩺">
           <div className="field-group">
             <div className="field">
-              <label>Minimum Disk Space (GB)</label>
+              <label className="label">Minimum Disk Space (GB)</label>
               <input type="number" min="0" className="control input-modern" value={disk} onChange={handleNumChange(setDisk)} onBlur={() => handleBlur(disk, setDisk, 0, 1000)} disabled={locked} placeholder="e.g. 10" />
               <div className="help-text">Servers below this limit will fail health checks.</div>
             </div>
             <div className="field">
-              <label>Last Report Time Threshold</label>
+              <label className="label">Last Report Time Threshold</label>
               <div className="input-combo">
-                <div style={{ flex: 1 }}><input type="number" min="0" className="control input-modern" value={lastReportValue} onChange={handleNumChange(setLastReportValue)} onBlur={() => handleBlur(lastReportValue, setLastReportValue, 0, 365)} disabled={locked} /></div>
+                <div className="env-patch-input"><input type="number" min="0" className="control input-modern" value={lastReportValue} onChange={handleNumChange(setLastReportValue)} onBlur={() => handleBlur(lastReportValue, setLastReportValue, 0, 365)} disabled={locked} /></div>
                 <div style={{ flex: 1.5, minWidth: '140px' }}><select value={lastReportUnit} onChange={(e) => setLastReportUnit(e.target.value)} disabled={locked} className="control"><option value="minutes">Minutes</option><option value="hours">Hours</option><option value="days">Days</option></select></div>
               </div>
               <div className="help-text">Max time allowed since last BigFix report.</div>
@@ -305,13 +261,11 @@ export default function Configuration({ onSaved, locked = false }) {
         <Section title="Process Gates & Controls" icon="⚙️">
           <Switch checked={requireChg} onChange={setRequireChg} label="ITSM Change Required" subLabel="Validate CHG status at 'Implement' stage before proceeding." disabled={locked} />
           
-          {/* FIX: HIDE CLONE & SNAPSHOT FOR EUC ROLE */}
           {!isEUC && (
             <>
               <Switch checked={cloneVM} onChange={setCloneVM} label="Clone VM" subLabel="Create a full clone of the VM before patching." disabled={locked} />
               <Switch checked={snapshotVM} onChange={setSnapshotVM} label="Snapshot VM" subLabel="Trigger a VM snapshot for quick rollback capability." disabled={locked} />
               
-              {/* --- Sandbox/Pilot Toggles (Admin Only) --- */}
               <div style={{marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 16}}>
                  <Switch 
                    checked={enableSandbox} 
@@ -341,45 +295,6 @@ export default function Configuration({ onSaved, locked = false }) {
         <button className="btn secondary" disabled={locked} onClick={() => { if(!locked) { setDisk(10); setRequireChg(true); setCheckService(false); setCloneVM(false); setSnapshotVM(false); setEnableSandbox(true); setEnablePilot(true); setLastReportValue(10); setLastReportUnit("days"); setEnv(f => ({ ...f, autoMail: false, postMail: false })); } }}>Reset to Defaults</button>
         <button className="btn primary" onClick={save} disabled={busy || locked}>{busy ? "Saving Settings..." : "Save Configuration"}</button>
       </div>
-      <style>{`
-        .config-container { padding: 24px; margin-bottom: 24px; overflow: visible !important; }
-        .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
-        h2 { font-size: 22px; font-weight: 700; color: var(--text); margin: 0 0 6px 0; }
-        .subtitle { font-size: 15px; color: var(--muted); margin: 0; }
-        .badge.locked { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 32px; align-items: start; }
-        .config-section { background: transparent; border: 1px solid var(--border); border-radius: 12px; overflow: visible; display: flex; flex-direction: column; height: 100%; }
-        .section-header { padding: 14px 18px; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; border-radius: 11px 11px 0 0; }
-        .section-icon { font-size: 18px; line-height: 1; }
-        .section-header h3 { font-size: 14px; font-weight: 700; margin: 0; text-transform: uppercase; color: var(--text); letter-spacing: 0.5px; }
-        .section-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; flex: 1; }
-        .field-group { display: flex; flex-direction: column; gap: 20px; }
-        .field label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-        .input-modern { width: 100%; height: 46px; border: 1px solid var(--border); border-radius: 12px; padding: 0 14px; font-size: 14px; transition: all 0.2s; background: #fff; color: var(--text); }
-        .input-modern:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); outline: none; }
-        .input-combo { display: flex; gap: 12px; width: 100%; }
-        .help-text { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
-        .switch-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 4px 0; }
-        .switch-row.disabled { opacity: 0.6; pointer-events: none; }
-        .switch-text { flex: 1; padding-top: 2px; }
-        .switch-label { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; }
-        .switch-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
-        .switch-toggle { width: 44px; height: 24px; border-radius: 20px; border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; padding: 0; margin-top: 2px; }
-        .switch-toggle.off { background: #cbd5e1; }
-        .switch-toggle.on { background: var(--primary); }
-        .switch-toggle .knob { width: 20px; height: 20px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .switch-toggle.on .knob { transform: translateX(20px); }
-        .footer-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 24px; border-top: 1px solid var(--border); }
-        .btn { height: 44px; padding: 0 24px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 14px; }
-        .btn.primary { background: var(--primary); color: #fff; box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--primary) 40%, transparent); }
-        .btn.primary:hover { transform: translateY(-1px); filter: brightness(110%); }
-        .btn.secondary { background: #fff; border-color: var(--border); color: var(--text); }
-        .btn.secondary:hover { background: var(--panel-2); border-color: #cbd5e1; }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
-        .banner { padding: 14px; border-radius: 12px; margin-bottom: 24px; font-size: 14px; font-weight: 500; }
-        .banner.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-        @media (max-width: 768px) { .config-grid { grid-template-columns: 1fr; } .header-row { flex-direction: column; gap: 12px; } .config-container { padding: 16px; } }
-      `}</style>
     </section>
   );
 }
