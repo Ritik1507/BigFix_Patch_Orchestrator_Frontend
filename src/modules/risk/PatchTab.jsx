@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import api from "../../api/api";
 
-export default function PatchTab({ addBaseline }) {
-  const [patches, setPatches] = useState([]);
+const getPatchKey = (p) => `${p.patch_id}-${p.site_name}`;
+
+export default function PatchTab({ patches, patchLoading, addBaseline }) {
   const [cves, setCves] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [modalData, setModalData] = useState(null);
 
   const [selectedMap, setSelectedMap] = useState({});
@@ -18,55 +18,56 @@ export default function PatchTab({ addBaseline }) {
     { column: "patch_id", operator: "contains", value: "", logic: "AND" },
   ]);
 
-  // =====================================================
-  // FETCH PATCHES + CVEs
-  // =====================================================
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-
-        const patchRes = await api.get("/patches");
-        const patchData = patchRes.data;
-        setPatches(patchData);
-
-        const payload = patchData.map((p) => ({
-          patch_id: p.patch_id,
-          site_name: p.site_name,
-        }));
-
-        const cveRes = await api.post("/cves/by-patches", {
-          patches: payload,
-        });
-
-        setCves(cveRes.data?.data || []);
-      } catch (err) {
-        console.error("PatchTab load failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // =====================================================
-  // PATCH → CVE MAP
-  // =====================================================
+  /* =======================================================
+     PATCH → CVE MAP
+  ======================================================= */
 
   const patchCveMap = useMemo(() => {
     const map = {};
+
     cves.forEach((c) => {
-      if (!map[c.patch_id]) map[c.patch_id] = [];
-      map[c.patch_id].push(c.cve_id);
+      const key = `${c.patch_id}-${c.site_name}`;
+
+      if (!map[key]) map[key] = [];
+
+      map[key].push(c.cve_id);
     });
+
     return map;
   }, [cves]);
 
-  // =====================================================
-  // SEVERITY LOGIC (UNCHANGED)
-  // =====================================================
+  if (patchLoading) return <div>Loading patches...</div>;
+
+  /* =======================================================
+     LAZY CVE LOADER
+  ======================================================= */
+
+  const loadPatchCves = async (patch) => {
+    const key = getPatchKey(patch);
+
+    if (patchCveMap[key]) return;
+
+    try {
+      const res = await api.post("/cves/by-patches", {
+        patches: [
+          {
+            patch_id: patch.patch_id,
+            site_name: patch.site_name,
+          },
+        ],
+      });
+
+      const data = res.data?.data || [];
+
+      setCves((prev) => [...prev, ...data]);
+    } catch (err) {
+      console.error("CVE fetch failed", err);
+    }
+  };
+
+  /* =======================================================
+     SEVERITY
+  ======================================================= */
 
   const getSeverityFromScore = (score) => {
     if (score >= 90) return "CRITICAL";
@@ -76,33 +77,32 @@ export default function PatchTab({ addBaseline }) {
     return "LOW";
   };
 
-  // =====================================================
-  // SELECTION LOGIC (UNCHANGED)
-  // =====================================================
+  /* =======================================================
+     SELECTION
+  ======================================================= */
 
   const toggleSelect = (patch) => {
     setSelectedMap((prev) => {
       const updated = { ...prev };
-      if (updated[patch.patch_id]) {
-        delete updated[patch.patch_id];
-      } else {
-        updated[patch.patch_id] = patch;
-      }
+      const key = getPatchKey(patch);
+
+      if (updated[key]) delete updated[key];
+      else updated[key] = patch;
+
       return updated;
     });
   };
 
-  const toggleSelectAll = (visiblePatches) => {
+  const toggleSelectAll = (visible) => {
     setSelectedMap((prev) => {
       const updated = { ...prev };
-      const allSelected = visiblePatches.every((p) => updated[p.patch_id]);
+
+      const allSelected = visible.every((p) => updated[getPatchKey(p)]);
 
       if (allSelected) {
-        visiblePatches.forEach((p) => delete updated[p.patch_id]);
+        visible.forEach((p) => delete updated[getPatchKey(p)]);
       } else {
-        visiblePatches.forEach((p) => {
-          updated[p.patch_id] = p;
-        });
+        visible.forEach((p) => (updated[getPatchKey(p)] = p));
       }
 
       return updated;
@@ -111,9 +111,9 @@ export default function PatchTab({ addBaseline }) {
 
   const selectedCount = Object.keys(selectedMap).length;
 
-  // =====================================================
-  // FILTER LOGIC (UPDATED)
-  // =====================================================
+  /* =======================================================
+     FILTERS
+  ======================================================= */
 
   const updateFilter = (index, key, value) => {
     const updated = [...filters];
@@ -130,6 +130,7 @@ export default function PatchTab({ addBaseline }) {
 
   const removeFilterRow = (index) => {
     if (filters.length === 1) return;
+
     setFilters(filters.filter((_, i) => i !== index));
   };
 
@@ -143,69 +144,33 @@ export default function PatchTab({ addBaseline }) {
     return filters.reduce((result, filter, index) => {
       let condition = true;
 
-      if (filter.column === "final_score") {
-        const score = Number(patch.final_score || 0);
-        const val = Number(filter.value);
+      if (filter.column === "cve_id") {
+        const list = patchCveMap[getPatchKey(patch)] || [];
+        const val = filter.value.toLowerCase();
 
-        if (!isNaN(val)) {
-          if (filter.operator === ">") condition = score > val;
-          else if (filter.operator === "<") condition = score < val;
-          else if (filter.operator === ">=") condition = score >= val;
-          else if (filter.operator === "<=") condition = score <= val;
-        }
-      } else if (filter.column === "cve_id") {
-        const cveList = patchCveMap[patch.patch_id] || [];
-        const searchValue = filter.value.toLowerCase();
-
-        if (filter.operator === "contains") {
-          condition = cveList.some((cve) =>
-            cve.toLowerCase().includes(searchValue),
-          );
-        } else if (filter.operator === "=") {
-          condition = cveList.some((cve) => cve.toLowerCase() === searchValue);
-        } else if (filter.operator === "does not contain") {
-          condition = !cveList.some((cve) =>
-            cve.toLowerCase().includes(searchValue),
-          );
-        }
-      } else if (filter.column === "computer_name") {
-        const computers = patch.applicable_computers || [];
-        const searchValue = filter.value.toLowerCase();
-
-        if (filter.operator === "contains") {
-          condition = computers.some((c) =>
-            c.toLowerCase().includes(searchValue),
-          );
-        } else if (filter.operator === "=") {
-          condition = computers.some((c) => c.toLowerCase() === searchValue);
-        } else if (filter.operator === "does not contain") {
-          condition = !computers.some((c) =>
-            c.toLowerCase().includes(searchValue),
-          );
-        }
+        condition = list.some((cve) => cve.toLowerCase().includes(val));
       } else {
-        const fieldValue = String(patch[filter.column] || "").toLowerCase();
-        const searchValue = filter.value.toLowerCase();
+        const field = String(patch[filter.column] || "").toLowerCase();
+        const val = filter.value.toLowerCase();
 
-        if (filter.operator === "contains") {
-          condition = fieldValue.includes(searchValue);
-        } else if (filter.operator === "=") {
-          condition = fieldValue === searchValue;
-        } else if (filter.operator === "does not contain") {
-          condition = !fieldValue.includes(searchValue);
-        }
+        if (filter.operator === "contains") condition = field.includes(val);
+        else if (filter.operator === "=") condition = field === val;
+        else if (filter.operator === "does not contain")
+          condition = !field.includes(val);
       }
 
       if (index === 0) return condition;
+
       if (filter.logic === "AND") return result && condition;
       if (filter.logic === "OR") return result || condition;
+
       return result;
     }, true);
   };
 
-  // =====================================================
-  // SORTING
-  // =====================================================
+  /* =======================================================
+     SORT
+  ======================================================= */
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -219,40 +184,15 @@ export default function PatchTab({ addBaseline }) {
     return sortConfig.direction === "asc" ? " ↑" : " ↓";
   };
 
-  const filteredPatches = patches.filter(applyFilters).sort((a, b) => {
-    if (!sortConfig.key) {
-      if (a.has_kev && !b.has_kev) return -1;
-      if (!a.has_kev && b.has_kev) return 1;
-      return (b.final_score || 0) - (a.final_score || 0);
-    }
-
-    let aVal = a[sortConfig.key];
-    let bVal = b[sortConfig.key];
-
-    if (sortConfig.key === "applicable_count") {
-      aVal = a.applicable_count || 0;
-      bVal = b.applicable_count || 0;
-    }
-
-    if (sortConfig.key === "cve_count") {
-      aVal = patchCveMap[a.patch_id]?.length || 0;
-      bVal = patchCveMap[b.patch_id]?.length || 0;
-    }
-
-    if (typeof aVal === "string") aVal = aVal.toLowerCase();
-    if (typeof bVal === "string") bVal = bVal.toLowerCase();
-
-    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-
-    return 0;
-  });
+  const filteredPatches = patches
+    .filter(applyFilters)
+    .sort((a, b) => (b.final_score || 0) - (a.final_score || 0));
 
   const totalCount = patches.length;
 
-  // =====================================================
-  // BASELINE LOGIC (UNCHANGED)
-  // =====================================================
+  /* =======================================================
+     BASELINE
+  ======================================================= */
 
   const approvePatches = () => {
     if (selectedCount === 0) return;
@@ -260,111 +200,79 @@ export default function PatchTab({ addBaseline }) {
     addBaseline({
       patches: Object.values(selectedMap),
     });
+
     setSelectedMap({});
   };
 
-  // =====================================================
-  // COLUMN RESIZE LOGIC
-  // =====================================================
-
-  const initResize = (e) => {
-    e.stopPropagation();
-
-    const th = e.target.parentElement;
-    const startX = e.clientX;
-    const startWidth = th.offsetWidth;
-
-    const onMouseMove = (moveEvent) => {
-      const newWidth = startWidth + (moveEvent.clientX - startX);
-      th.style.width = newWidth + "px";
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  };
-
-  // =====================================================
-  // RENDER
-  // =====================================================
-
-  if (loading) return <div>Loading...</div>;
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <div>
-      {filters.map((filter, index) => (
-        <div key={index} className="risk-filter-row">
-          {index > 0 && (
-            <select
-              value={filter.logic}
-              onChange={(e) => updateFilter(index, "logic", e.target.value)}
-            >
-              <option value="AND">AND</option>
-              <option value="OR">OR</option>
-            </select>
-          )}
+      {/* FILTERS */}
 
-          <select
-            value={filter.column}
-            onChange={(e) => updateFilter(index, "column", e.target.value)}
-          >
-            <option value="patch_id">Patch ID</option>
-            <option value="patch_name">Patch Name</option>
-            <option value="severity">Severity</option>
-            <option value="vendor">Vendor</option>
-            <option value="final_score">Score</option>
-            <option value="cve_id">CVE ID</option>
-            <option value="computer_name">Computer Name</option>
-          </select>
+      <div className="risk-filter-container">
+        {filters.map((filter, index) => (
+          <div key={index} className="risk-filter-row">
+            {index > 0 && (
+              <select
+                value={filter.logic}
+                onChange={(e) => updateFilter(index, "logic", e.target.value)}
+              >
+                <option value="AND">AND</option>
+                <option value="OR">OR</option>
+              </select>
+            )}
 
-          {filter.column === "final_score" ? (
             <select
-              value={filter.operator}
-              onChange={(e) => updateFilter(index, "operator", e.target.value)}
+              value={filter.column}
+              onChange={(e) => updateFilter(index, "column", e.target.value)}
             >
-              <option value=">">greater than</option>
-              <option value="<">less than</option>
-              <option value=">=">greater or equal</option>
-              <option value="<=">less or equal</option>
+              <option value="patch_id">Patch ID</option>
+              <option value="patch_name">Patch Name</option>
+              <option value="severity">Severity</option>
+              <option value="vendor">Vendor</option>
+              <option value="final_score">Score</option>
+              <option value="cve_id">CVE ID</option>
             </select>
-          ) : (
+
             <select
               value={filter.operator}
               onChange={(e) => updateFilter(index, "operator", e.target.value)}
             >
               <option value="contains">contains</option>
-              <option value="=">equal</option>
+              <option value="=">equals</option>
               <option value="does not contain">does not contain</option>
             </select>
-          )}
 
-          <input
-            value={filter.value}
-            onChange={(e) => updateFilter(index, "value", e.target.value)}
-            placeholder="Enter value"
-          />
+            <input
+              value={filter.value}
+              onChange={(e) => updateFilter(index, "value", e.target.value)}
+              placeholder="Enter value"
+            />
 
-          {index === filters.length - 1 && (
-            <button onClick={addFilterRow}>+</button>
-          )}
+            {index === filters.length - 1 && (
+              <button onClick={addFilterRow}>+</button>
+            )}
 
-          {filters.length > 1 && (
-            <button onClick={() => removeFilterRow(index)}>−</button>
-          )}
-        </div>
-      ))}
+            {filters.length > 1 && (
+              <button onClick={() => removeFilterRow(index)}>−</button>
+            )}
+          </div>
+        ))}
 
-      <button className="risk-reset-btn" onClick={resetFilters}>
-        Reset Filters
-      </button>
+        <button className="risk-reset-btn" onClick={resetFilters}>
+          Reset Filters
+        </button>
+      </div>
+
+      {/* APPROVE */}
 
       <div className="risk-header-info">
         Selected: {selectedCount} / {totalCount} Total Patches
       </div>
+
       <div className="risk-approve-container">
         <button
           className="risk-approve-btn"
@@ -374,6 +282,8 @@ export default function PatchTab({ addBaseline }) {
           Approve Patches ({selectedCount})
         </button>
       </div>
+
+      {/* TABLE */}
 
       <div className="risk-table">
         <table>
@@ -386,133 +296,90 @@ export default function PatchTab({ addBaseline }) {
                 />
               </th>
 
-              <th
-                onClick={() => handleSort("patch_id")}
-                style={{ position: "relative", width: 160 }}
-              >
-                Patch ID
-                <span className="sort-arrow">{getSortArrow("patch_id")}</span>
-                <div
-                  className="column-resizer"
-                  onMouseDown={(e) => initResize(e)}
-                />
+              <th onClick={() => handleSort("patch_id")}>
+                Patch ID {getSortArrow("patch_id")}
               </th>
 
-              <th
-                onClick={() => handleSort("patch_name")}
-                style={{ position: "relative", width: 420 }}
-              >
-                Name
-                <span className="sort-arrow">{getSortArrow("patch_name")}</span>
-                <div
-                  className="column-resizer"
-                  onMouseDown={(e) => initResize(e)}
-                />
+              <th onClick={() => handleSort("patch_name")}>
+                Name {getSortArrow("patch_name")}
               </th>
 
-              <th
-                onClick={() => handleSort("applicable_count")}
-                style={{
-                  position: "relative",
-                  width: 100,
-                  textAlign: "center",
-                }}
-              >
-                Applicable
-                <span className="sort-arrow">
-                  {getSortArrow("applicable_count")}
-                </span>
-                <div
-                  className="column-resizer"
-                  onMouseDown={(e) => initResize(e)}
-                />
-              </th>
+              <th>Applicable</th>
 
-              <th
-                onClick={() => handleSort("cve_count")}
-                style={{ position: "relative", width: 80, textAlign: "center" }}
-              >
-                CVEs
-                <span className="sort-arrow">{getSortArrow("cve_count")}</span>
-                <div
-                  className="column-resizer"
-                  onMouseDown={(e) => initResize(e)}
-                />
-              </th>
+              <th>CVEs</th>
 
-              <th style={{ width: 120, textAlign: "center" }}>Severity</th>
+              <th>Severity</th>
 
-              <th
-                onClick={() => handleSort("final_score")}
-                style={{ position: "relative", width: 100, textAlign: "right" }}
-              >
-                Score
-                <span className="sort-arrow">
-                  {getSortArrow("final_score")}
-                </span>
-                <div
-                  className="column-resizer"
-                  onMouseDown={(e) => initResize(e)}
-                />
+              <th onClick={() => handleSort("final_score")}>
+                Score {getSortArrow("final_score")}
               </th>
             </tr>
           </thead>
 
           <tbody>
             {filteredPatches.map((p) => {
-              const isSelected = !!selectedMap[p.patch_id];
+              const isSelected = !!selectedMap[getPatchKey(p)];
               const score = Number(p.final_score || 0);
               const derivedSeverity = getSeverityFromScore(score);
 
               return (
                 <tr
-                  key={p.patch_id}
+                  key={getPatchKey(p)}
                   className={isSelected ? "selected-row" : ""}
+                  onClick={() => toggleSelect(p)}
                 >
-                  <td style={{ width: 40 }}>
+                  <td>
                     <input
                       type="checkbox"
                       checked={isSelected}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={() => toggleSelect(p)}
                     />
                   </td>
 
-                  <td style={{ width: 160 }}>
-                    {p.patch_id}
+                  <td>
+                    {p.patch_id?.replace(/^BIGFIX-/, "")}
+
                     {p.has_kev && <span className="kev-badge">KEV</span>}
                   </td>
 
-                  <td style={{ width: 420 }}>{p.patch_name}</td>
+                  <td>{p.patch_name}</td>
 
-                  <td style={{ width: 100, textAlign: "center" }}>
+                  <td>
                     <span
                       style={{ cursor: "pointer", color: "#3b82f6" }}
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
+
                         setModalData({
                           title: "Applicable Computers",
                           items: p.applicable_computers || [],
-                        })
-                      }
+                        });
+                      }}
                     >
                       {p.applicable_count || 0}
                     </span>
                   </td>
 
-                  <td style={{ width: 80, textAlign: "center" }}>
+                  <td>
                     <span
                       style={{ cursor: "pointer", color: "#3b82f6" }}
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        loadPatchCves(p);
+
                         setModalData({
                           title: "CVE IDs",
-                          items: patchCveMap[p.patch_id] || [],
-                        })
-                      }
+                          items: patchCveMap[getPatchKey(p)] || [],
+                        });
+                      }}
                     >
-                      {patchCveMap[p.patch_id]?.length || 0}
+                      {p.cve_count ?? patchCveMap[getPatchKey(p)]?.length ?? 0}
                     </span>
                   </td>
 
-                  <td style={{ width: 120, textAlign: "center" }}>
+                  <td>
                     <span
                       className={`severity-badge severity-${derivedSeverity.toLowerCase()}`}
                     >
@@ -520,15 +387,15 @@ export default function PatchTab({ addBaseline }) {
                     </span>
                   </td>
 
-                  <td style={{ width: 100, textAlign: "right" }}>
-                    {score.toFixed(2)}
-                  </td>
+                  <td style={{ textAlign: "right" }}>{score.toFixed(2)}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {/* MODAL */}
 
       {modalData && (
         <div className="risk-modal-overlay" onClick={() => setModalData(null)}>
@@ -537,6 +404,7 @@ export default function PatchTab({ addBaseline }) {
               <h3>
                 {modalData.title} ({modalData.items.length})
               </h3>
+
               <button
                 className="risk-modal-close"
                 onClick={() => setModalData(null)}
