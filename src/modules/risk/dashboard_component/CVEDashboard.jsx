@@ -31,15 +31,7 @@ export default function CveDashboard() {
 
         setPatches(patchData);
 
-        const payload = patchData.map((p) => ({
-          patch_id: p.patch_id,
-          site_name: p.site_name,
-        }));
-
-        const cveRes = await api.post("/cves/by-patches", {
-          patches: payload,
-        });
-
+        const cveRes = await api.get("/cves");
         setCves(cveRes.data?.data || []);
       } catch (err) {
         console.error(err);
@@ -79,6 +71,7 @@ export default function CveDashboard() {
           patches: new Set(),
           devices: new Set(),
           severity: c.cvss_severity || "UNKNOWN",
+          kev: c.has_kev ? "YES" : "NO",
         };
       }
 
@@ -94,6 +87,7 @@ export default function CveDashboard() {
     return Object.values(map).map((c) => ({
       cve_id: c.cve_id,
       severity: c.severity,
+      kev: c.kev,
       patch_count: c.patches.size,
       device_count: c.devices.size,
       patches: Array.from(c.patches),
@@ -138,6 +132,11 @@ export default function CveDashboard() {
           condition = list.some((d) => d.toLowerCase() === search);
       }
 
+      if (filter.column === "kev") {
+        const field = cve.kev.toLowerCase();
+        condition = field === search;
+      }
+
       if (index === 0) return condition;
 
       if (filter.logic === "AND") return result && condition;
@@ -161,13 +160,13 @@ export default function CveDashboard() {
   // =============================
 
   const exportCSV = () => {
-    const header = ["CVE", "Patch IDs", "Devices"];
+    const header = ["CVE", "KEV", "Patch IDs", "Devices"];
 
     const rows = filteredCVEs.map((c) => {
       const patchList = `[${c.patches.join(",")}]`;
       const deviceList = `[${c.devices.join(",")}]`;
 
-      return [c.cve_id, `"${patchList}"`, `"${deviceList}"`];
+      return [c.cve_id, c.kev, `"${patchList}"`, `"${deviceList}"`];
     });
 
     const csv =
@@ -246,6 +245,7 @@ export default function CveDashboard() {
                 <option value="cve_id">CVE ID</option>
                 <option value="patch_id">Patch ID</option>
                 <option value="device_name">Device</option>
+                <option value="kev">KEV</option>
               </select>
 
               <select
@@ -293,6 +293,7 @@ export default function CveDashboard() {
           <thead>
             <tr>
               <th>CVE</th>
+              <th style={{ textAlign: "center" }}>KEV</th>
               <th style={{ textAlign: "center" }}>Patches</th>
               <th style={{ textAlign: "center" }}>Devices</th>
             </tr>
@@ -302,6 +303,14 @@ export default function CveDashboard() {
             {paginatedCVEs.map((c) => (
               <tr key={c.cve_id}>
                 <td>{c.cve_id}</td>
+
+                <td style={{ textAlign: "center" }}>
+                  {c.kev === "YES" ? (
+                    <span className="kev-badge">YES</span>
+                  ) : (
+                    <span className="kev-none">NO</span>
+                  )}
+                </td>
 
                 <td
                   className="cve-link cve-count"
