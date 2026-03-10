@@ -1,6 +1,44 @@
 /* =====================================================
    GLOBAL RISK CONTAINER & OVERRIDES
 ===================================================== */
+:root {
+  --severity-critical: #dc2626;
+  --severity-high: #ea580c;
+  --severity-important: #d97706;
+  --severity-moderate: #16a34a;
+  --severity-low: #2563eb;
+}
+
+.severity-critical { 
+  background: color-mix(in srgb, var(--severity-critical) 15%, transparent); 
+  color: var(--severity-critical); 
+  border: 1px solid var(--severity-critical); 
+}
+
+.severity-high { 
+  background: color-mix(in srgb, var(--severity-high) 15%, transparent); 
+  color: var(--severity-high); 
+  border: 1px solid var(--severity-high); 
+}
+
+.severity-important { 
+  background: color-mix(in srgb, var(--severity-important) 15%, transparent); 
+  color: var(--severity-important); 
+  border: 1px solid var(--severity-important); 
+}
+
+.severity-moderate { 
+  background: color-mix(in srgb, var(--severity-moderate) 15%, transparent); 
+  color: var(--severity-moderate); 
+  border: 1px solid var(--severity-moderate); 
+}
+
+.severity-low { 
+  background: color-mix(in srgb, var(--severity-low) 15%, transparent); 
+  color: var(--severity-low); 
+  border: 1px solid var(--severity-low); 
+}
+
 .risk-container {
   padding: 0;
   min-height: 100%;
@@ -221,13 +259,6 @@ tbody tr.selected-row td {
   letter-spacing: 0.5px;
 }
 
-.severity-critical { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); border: 1px solid var(--danger); }
-.severity-high { background: color-mix(in srgb, #ea580c 15%, transparent); color: #ea580c; border: 1px solid #ea580c; }
-/* FIXED TEXT COLOR FOR IMPORTANT */
-.severity-important { background: color-mix(in srgb, var(--warn) 15%, transparent); color: #b39b00; border: 1px solid var(--warn); }
-.severity-moderate { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); border: 1px solid var(--success); }
-.severity-low { background: color-mix(in srgb, var(--info) 15%, transparent); color: var(--info); border: 1px solid var(--info); }
-
 
 /* =====================================================
    SCORE BADGES
@@ -246,7 +277,7 @@ tbody tr.selected-row td {
 
 .score-critical { background: var(--danger); color: var(--danger-text); }
 .score-high { background: #ea580c; color: #ffffff; }
-.score-important { background: var(--warn); color: var(--warn-text); }
+.score-important { background: var(--severity-important); color: #ffffff; }
 .score-moderate { background: var(--success); color: var(--success-text); }
 .score-low { background: var(--info); color: var(--primary-text); }
 
