@@ -1,5 +1,5 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from "../../api/api";
 
 import DashboardOverview from "./dashboard_component/DashboardOverview";
 import CVEDashboard from "./dashboard_component/CVEDashboard";
@@ -9,9 +9,48 @@ import BaselineDashboard from "./dashboard_component/BaselineDashboard";
 
 import "./dashboard.css";
 
-export default function DashboardTab() {
+export default function DashboardTab({ baselines }) {
 
   const [activeSection, setActiveSection] = useState("overview");
+
+  const [patches, setPatches] = useState([]);
+  const [cves, setCves] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+
+  /* =========================================
+     LOAD PATCHES + CVES (FROM BACKEND CACHE)
+  ========================================= */
+
+  useEffect(() => {
+
+    const loadDashboardData = async () => {
+
+      try {
+
+        const [patchRes, cveRes] = await Promise.all([
+          api.get("/patches"),
+          api.get("/cves")
+        ]);
+
+        setPatches(patchRes.data || []);
+        setCves(cveRes.data?.data || []);
+
+      } catch (err) {
+
+        console.error("Dashboard load failed:", err);
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    loadDashboardData();
+
+  }, []);
 
   return (
 
@@ -62,28 +101,60 @@ export default function DashboardTab() {
 
       <div className="dashboard-content">
 
-        {activeSection === "overview" &&
-          <DashboardOverview navigate={setActiveSection} />
+        {loading && (
+          <div className="dashboard-loading">
+            Loading dashboard...
+          </div>
+        )}
+
+        {!loading && activeSection === "overview" &&
+          <DashboardOverview
+            navigate={setActiveSection}
+            patches={patches}
+            cves={cves}
+            baselines={baselines}
+          />
         }
 
-        {activeSection === "cve" &&
-          <CVEDashboard navigate={setActiveSection} />
+        {!loading && activeSection === "cve" &&
+          <CVEDashboard
+            navigate={setActiveSection}
+            patches={patches}
+            cves={cves}
+            baselines={baselines}
+          />
         }
 
-        {activeSection === "patch" &&
-          <PatchDashboard navigate={setActiveSection} />
+        {!loading && activeSection === "patch" &&
+          <PatchDashboard
+            navigate={setActiveSection}
+            patches={patches}
+            cves={cves}
+            baselines={baselines}
+          />
         }
 
-        {activeSection === "computer" &&
-          <ComputerDashboard navigate={setActiveSection} />
+        {!loading && activeSection === "computer" &&
+          <ComputerDashboard
+            navigate={setActiveSection}
+            patches={patches}
+            cves={cves}
+            baselines={baselines}
+          />
         }
 
-        {activeSection === "baseline" &&
-          <BaselineDashboard navigate={setActiveSection} />
+        {!loading && activeSection === "baseline" &&
+          <BaselineDashboard
+            navigate={setActiveSection}
+            patches={patches}
+            cves={cves}
+            baselines={baselines}
+          />
         }
 
       </div>
 
     </div>
+
   );
 }
