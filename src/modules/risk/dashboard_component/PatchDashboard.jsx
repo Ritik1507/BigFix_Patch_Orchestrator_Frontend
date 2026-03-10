@@ -91,7 +91,8 @@ export default function PatchDashboard() {
       const score = Number(patch.final_score || 0);
 
       return {
-        patch_id: patch.patch_id,
+        // THIS LINE STRIPS "BIGFIX-" FROM THE ID
+        patch_id: patch.patch_id ? patch.patch_id.replace(/^BIGFIX-/i, "") : "", 
         score,
         severity: getSeverityFromScore(score),
         cve_count: cvesForPatch.length,

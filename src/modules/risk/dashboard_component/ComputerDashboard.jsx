@@ -85,8 +85,8 @@ export default function ComputerDashboard() {
             cves: new Set(),
           };
         }
-
-        map[device].patches.add(patch.patch_id);
+        const cleanPatchId = patch.patch_id ? patch.patch_id.replace(/^BIGFIX-/i, "") : "";
+        map[device].patches.add(cleanPatchId);
 
         cvesForPatch.forEach((cve) => {
           map[device].cves.add(cve);

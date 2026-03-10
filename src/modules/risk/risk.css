@@ -223,9 +223,33 @@ tbody tr.selected-row td {
 
 .severity-critical { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); border: 1px solid var(--danger); }
 .severity-high { background: color-mix(in srgb, #ea580c 15%, transparent); color: #ea580c; border: 1px solid #ea580c; }
-.severity-important { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); border: 1px solid var(--warn); }
+/* FIXED TEXT COLOR FOR IMPORTANT */
+.severity-important { background: color-mix(in srgb, var(--warn) 15%, transparent); color: #b39b00; border: 1px solid var(--warn); }
 .severity-moderate { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); border: 1px solid var(--success); }
 .severity-low { background: color-mix(in srgb, var(--info) 15%, transparent); color: var(--info); border: 1px solid var(--info); }
+
+
+/* =====================================================
+   SCORE BADGES
+===================================================== */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "Roboto Mono", monospace;
+  min-width: 48px;
+}
+
+.score-critical { background: var(--danger); color: var(--danger-text); }
+.score-high { background: #ea580c; color: #ffffff; }
+.score-important { background: var(--warn); color: var(--warn-text); }
+.score-moderate { background: var(--success); color: var(--success-text); }
+.score-low { background: var(--info); color: var(--primary-text); }
+
 
 /* =====================================================
    KEV BADGES
@@ -682,6 +706,15 @@ tbody tr.selected-row td {
 }
 
 .btn { 
+  margin-bottom: 10px;
+  position: relative; overflow: hidden; border: 1px solid var(--border); background: var(--info); 
+  color: var(--panel); padding: 0 16px; height: 34px; border-radius: var(--radius-sm); 
+  font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s ease; 
+  display: inline-flex; gap: 8px; align-items: center; justify-content: center; 
+  white-space: nowrap; font-family: "Inter", sans-serif;
+}
+
+.risk-reset-btn {
   position: relative; overflow: hidden; border: 1px solid var(--border); background: var(--info); 
   color: var(--panel); padding: 0 16px; height: 34px; border-radius: var(--radius-sm); 
   font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s ease; 

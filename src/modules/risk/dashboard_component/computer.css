@@ -65,3 +65,11 @@
 .device-modal-body ul { margin: 0; padding-left: 20px; }
 .device-modal-close { border: none; background: none; font-size: 20px; cursor: pointer; color: var(--muted); padding: 4px; line-height: 1; }
 .device-modal-close:hover { color: var(--danger); }
+.risk-reset-btn {
+  margin-bottom: 10px;
+  position: relative; overflow: hidden; border: 1px solid var(--border); background: var(--info); 
+  color: var(--panel); padding: 0 16px; height: 34px; border-radius: var(--radius-sm); 
+  font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.2s ease; 
+  display: inline-flex; gap: 8px; align-items: center; justify-content: center; 
+  white-space: nowrap; font-family: "Inter", sans-serif;
+}

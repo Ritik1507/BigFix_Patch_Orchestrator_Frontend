@@ -72,7 +72,7 @@ export default function PatchTab({ patches, patchLoading, addBaseline }) {
   };
 
   /* =======================================================
-     SEVERITY
+     SEVERITY & SCORE HELPERS
   ======================================================= */
 
   const getSeverityFromScore = (score) => {
@@ -81,6 +81,14 @@ export default function PatchTab({ patches, patchLoading, addBaseline }) {
     if (score >= 60) return "IMPORTANT";
     if (score >= 40) return "MODERATE";
     return "LOW";
+  };
+
+  const getScoreColorClass = (score) => {
+    if (score >= 90) return "score-critical";
+    if (score >= 75) return "score-high";
+    if (score >= 60) return "score-important";
+    if (score >= 40) return "score-moderate";
+    return "score-low";
   };
 
   /* =======================================================
@@ -359,7 +367,7 @@ export default function PatchTab({ patches, patchLoading, addBaseline }) {
 
       <div className="risk-approve-container">
         <button
-          className="risk-approve-btn"
+          className="btn"
           disabled={selectedCount === 0}
           onClick={approvePatches}
         >
@@ -400,7 +408,7 @@ export default function PatchTab({ patches, patchLoading, addBaseline }) {
 
               <th onClick={() => handleSort("applicable_count")}>
                 <span className="risk-th-content">
-                  Applicable
+                  Applicable Computers
                   <span className="risk-sort-arrow">
                     {getSortArrow("applicable_count")}
                   </span>
@@ -409,18 +417,18 @@ export default function PatchTab({ patches, patchLoading, addBaseline }) {
 
               <th onClick={() => handleSort("cve_count")}>
                 <span className="risk-th-content">
-                  CVEs
+                  Associated CVE IDs
                   <span className="risk-sort-arrow">
                     {getSortArrow("cve_count")}
                   </span>
                 </span>
               </th>
 
-              <th>Severity</th>
+              <th>Vulnerability Severity</th>
 
               <th onClick={() => handleSort("final_score")}>
                 <span className="risk-th-content">
-                  Score
+                  Vulnerability Score
                   <span className="risk-sort-arrow">
                     {getSortArrow("final_score")}
                   </span>
@@ -504,7 +512,12 @@ export default function PatchTab({ patches, patchLoading, addBaseline }) {
                     </span>
                   </td>
 
-                  <td style={{ textAlign: "right" }}>{score.toFixed(2)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {/* APPLIED SCORE COLOR HIGHLIGHT HERE */}
+                    <span className={`score-badge ${getScoreColorClass(score)}`}>
+                      {score.toFixed(2)}
+                    </span>
+                  </td>
                 </tr>
               );
             })}
